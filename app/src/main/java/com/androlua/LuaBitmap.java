@@ -1,6 +1,7 @@
 package com.androlua;
 
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
@@ -16,6 +17,7 @@ import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -24,7 +26,29 @@ public class LuaBitmap {
     static WeakHashMap<String, WeakReference<Bitmap>> cache = new WeakHashMap<String, WeakReference<Bitmap>>();
 
     private static int l;
-    private static long mCacheTime = 7 * 24 * 60 * 60 * 1000;
+    private static long mCacheTime = 60 * 60 * 1000;
+    private static HashMap<String, String> sHeader;
+    public static void setHeader(HashMap<String,String> header){
+        sHeader=header;
+    }
+
+    public static void setUserAgent(String userAgent) {
+        if (sHeader == null)
+            sHeader = new HashMap<>();
+        sHeader.put("User-Agent", userAgent);
+    }
+
+    public static void setReferer(String referer) {
+        if (sHeader == null)
+            sHeader = new HashMap<>();
+        sHeader.put("Referer", referer);
+    }
+
+    public static void setCookie(String cookie) {
+        if (sHeader == null)
+            sHeader = new HashMap<>();
+        sHeader.put("Cookie", cookie);
+    }
 
     public static void setCacheTime(long time) {
         mCacheTime = time;
@@ -36,7 +60,8 @@ public class LuaBitmap {
 
     public static boolean checkCache(LuaContext context, String url) {
         // TODO: Implement this method
-        String path = context.getLuaExtDir("cache") + "/" + url.hashCode();
+        @SuppressLint("DefaultLocale")
+        String path = new File(imageCacheDir , String.format("%08x",url.hashCode())).getAbsolutePath();
         File f = new File(path);
         return f.exists() && mCacheTime!=-1 && System.currentTimeMillis() - f.lastModified() < mCacheTime;
     }
@@ -65,11 +90,17 @@ public class LuaBitmap {
         is.close();
         return bitmap;
     }
+    private static String imageCacheDir=new File(LuaApplication.getInstance().getExternalCacheDir(),"images").getAbsolutePath();
+    static {
+        new File(imageCacheDir).mkdirs();
+    }
 
     public static Bitmap getHttpBitmap(LuaContext context, String url) throws IOException {
         //Log.d(TAG, url);
-        String path = context.getLuaExtDir("cache") + "/" + url.hashCode();
+        @SuppressLint("DefaultLocale")
+        String path = new File(imageCacheDir, String.format("%08x", url.hashCode())).getAbsolutePath();
         File f = new File(path);
+        f.getParentFile().mkdirs();
         //context.sendMsg(System.currentTimeMillis() +";"+ f.lastModified() +";"+ mCacheTime +";"+(System.currentTimeMillis() - f.lastModified() < mCacheTime));
         if (f.exists() && mCacheTime!=-1 && System.currentTimeMillis() - f.lastModified() < mCacheTime) {
             return decodeScale(context.getWidth(), new File(path));
@@ -79,6 +110,12 @@ public class LuaBitmap {
         URLConnection conn = (HttpURLConnection) myFileUrl.openConnection();
         conn.setConnectTimeout(120000);
         conn.setDoInput(true);
+        if (sHeader != null) {
+            Set<Map.Entry<String, String>> entries = sHeader.entrySet();
+            for (Map.Entry<String, String> entry : entries) {
+                conn.setRequestProperty(entry.getKey(), entry.getValue());
+            }
+        }
         conn.connect();
         InputStream is = conn.getInputStream();
         FileOutputStream out = new FileOutputStream(path);

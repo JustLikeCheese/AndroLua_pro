@@ -13,6 +13,8 @@ import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Path;
+import android.graphics.Rect;
+import android.graphics.Region;
 import android.hardware.display.VirtualDisplay;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -298,6 +300,7 @@ public class LuaAccessibilityService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        mLuaAccessibilityService=null;
         if(sAccessibilityServiceCallbacks!=null)
             sAccessibilityServiceCallbacks.onDestroy(this);
         stopScreenshot();

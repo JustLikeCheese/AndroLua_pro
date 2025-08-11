@@ -224,6 +224,10 @@ public class LuaApplication extends Application implements LuaContext {
         return data;
     }
 
+    @Override
+    public Object getSharedData() {
+        return mSharedPreferences.getAll();
+    }
 
     @Override
     public Object getSharedData(String key) {

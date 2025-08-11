@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zlib.h>
 
 
 /*
@@ -549,6 +550,16 @@ LUALIB_API void luaL_pushresult (luaL_Buffer *B) {
   }
 }
 
+LUALIB_API const char *luaL_resultBuffer (luaL_Buffer *B) {
+    lua_State *L = B->L;
+    const char *res = lua_pushlstring(L, B->b, B->n);
+    if (buffonstack(B)) {
+        resizebox(L, -2, 0);  /* delete old buffer */
+        lua_remove(L, -2);  /* remove its header from the stack */
+    }
+    lua_pop(L,1);
+    return res;
+}
 
 LUALIB_API void luaL_pushresultsize (luaL_Buffer *B, size_t sz) {
   luaL_addsize(B, sz);
@@ -700,7 +711,7 @@ static int skipcomment (LoadF *lf, int *cp) {
   else return 0;  /* no comment */
 }
 
-static luaL_Buffer read_all (lua_State *L, FILE *f) {
+static const char *read_all (lua_State *L, FILE *f, size_t *len) {
     size_t nr;
     luaL_Buffer b;
     luaL_buffinit(L, &b);
@@ -709,45 +720,50 @@ static luaL_Buffer read_all (lua_State *L, FILE *f) {
         nr = fread(p, sizeof(char), LUAL_BUFFERSIZE, f);
         luaL_addsize(&b, nr);
     } while (nr == LUAL_BUFFERSIZE);
-    return b;
+    *len=b.n;
+    return luaL_resultBuffer(&b);
 }
 
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#define LOG_TAG "lua"
+#define LOGD(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#endif
+
 LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
-                                             const char *mode) {
-  LoadF lf;
-  int status, readstatus;
-  int c;
-  int fnameindex = lua_gettop(L) + 1;  /* index of filename on the stack */
-  if (filename == NULL) {
-    lua_pushliteral(L, "=stdin");
-    lf.f = stdin;
-  }
-  else {
-    lua_pushfstring(L, "@%s", filename);
-    lf.f = fopen(filename, "r");
-    if (lf.f == NULL) return errfile(L, "open", fnameindex);
-  }
-  if (skipcomment(&lf, &c))  /* read initial portion */
-    lf.buff[lf.n++] = '\n';  /* add line to correct line numbers */
-  if (c == LUA_SIGNATURE[0] && filename) {  /* binary file? */
-      lf.f = freopen(filename, "rb", lf.f);  /* reopen in binary mode */
-      if (lf.f == NULL) return errfile(L, "reopen", fnameindex);
-      luaL_Buffer b = read_all(L, lf.f);
-      lf.f = freopen(filename, "rb", lf.f);  /* reopen in binary mode */
-      skipcomment(&lf, &c);  /* re-read initial portion */
-  }
-  if (c != EOF)
-    lf.buff[lf.n++] = c;  /* 'c' is the first character of the stream */
-  status = lua_load(L, getF, &lf, lua_tostring(L, -1), mode);
-  readstatus = ferror(lf.f);
-  if (filename) fclose(lf.f);  /* close file (even in case of errors) */
-  if (readstatus) {
-    lua_settop(L, fnameindex);  /* ignore results from 'lua_load' */
-    return errfile(L, "read", fnameindex);
-  }
-  lua_remove(L, fnameindex);
-  return status;
+                               const char *mode) {
+    LoadF lf;
+    int status, readstatus;
+    int c;
+    int fnameindex = lua_gettop(L) + 1;  /* index of filename on the stack */
+    if (filename == NULL) {
+        lua_pushliteral(L, "=stdin");
+        lf.f = stdin;
+    }
+    else {
+        lua_pushfstring(L, "@%s", filename);
+        lf.f = fopen(filename, "r");
+        if (lf.f == NULL) return errfile(L, "open", fnameindex);
+    }
+    if (skipcomment(&lf, &c))  /* read initial portion */
+        lf.buff[lf.n++] = '\n';  /* add line to correct line numbers */
+
+    if (c == LUA_SIGNATURE[0] && filename) {  /* binary file? */
+        lf.f = freopen(filename, "rb", lf.f);  /* reopen in binary mode */
+        skipcomment(&lf, &c);  /* re-read initial portion */
+    }
+    if (c != EOF)
+        lf.buff[lf.n++] = c;  /* 'c' is the first character of the stream */
+    status = lua_load(L, getF, &lf, lua_tostring(L, -1), mode);
+    readstatus = ferror(lf.f);
+    if (filename) fclose(lf.f);  /* close file (even in case of errors) */
+    if (readstatus) {
+        lua_settop(L, fnameindex);  /* ignore results from 'lua_load' */
+        return errfile(L, "read", fnameindex);
+    }
+    lua_remove(L, fnameindex);
+    return status;
 }
 
 
@@ -769,6 +785,7 @@ static const char *getS (lua_State *L, void *ud, size_t *size) {
 
 LUALIB_API int luaL_loadbufferx (lua_State *L, const char *buff, size_t size,
                                  const char *name, const char *mode) {
+  //LOGD("encrypt %d %s %x %s",size,name,buff[0],buff);
   LoadS ls;
   ls.s = buff;
   ls.size = size;
@@ -781,8 +798,6 @@ LUALIB_API int luaL_loadstring (lua_State *L, const char *s) {
 }
 
 /* }====================================================== */
-
-
 
 LUALIB_API int luaL_getmetafield (lua_State *L, int obj, const char *event) {
   if (!lua_getmetatable(L, obj))  /* no metatable? */

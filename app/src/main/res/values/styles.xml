@@ -3,4 +3,136 @@
     <style name="app_theme" parent="android:Theme.Holo.Light.NoActionBar">
         <item name="android:windowBackground" >@drawable/welcome</item>
     </style>
+    <style name="AndroLua1" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua1</item>
+        <item name="android:colorPrimaryDark">@color/androlua1</item>
+        <item name="android:colorAccent">@color/androlua1</item>
+		<item name="android:statusBarColor">@color/androlua1</item>
+	</style>
+
+	<style name="AndroLua2" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua2</item>
+        <item name="android:colorPrimaryDark">@color/androlua2</item>
+        <item name="android:colorAccent">@color/androlua2</item>
+		<item name="android:statusBarColor">@color/androlua2</item>
+	</style>
+
+	<style name="AndroLua3" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua3</item>
+        <item name="android:colorPrimaryDark">@color/androlua3</item>
+        <item name="android:colorAccent">@color/androlua3</item>
+		<item name="android:statusBarColor">@color/androlua3</item>
+	</style>
+
+	<style name="AndroLua4" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua4</item>
+        <item name="android:colorPrimaryDark">@color/androlua4</item>
+        <item name="android:colorAccent">@color/androlua4</item>
+		<item name="android:statusBarColor">@color/androlua4</item>
+	</style>
+
+	<style name="AndroLua5" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua5</item>
+        <item name="android:colorPrimaryDark">@color/androlua5</item>
+        <item name="android:colorAccent">@color/androlua5</item>
+		<item name="android:statusBarColor">@color/androlua5</item>
+	</style>
+
+	<style name="AndroLua6" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua6</item>
+        <item name="android:colorPrimaryDark">@color/androlua6</item>
+        <item name="android:colorAccent">@color/androlua6</item>
+		<item name="android:statusBarColor">@color/androlua6</item>
+	</style>
+
+	<style name="AndroLua7" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua7</item>
+        <item name="android:colorPrimaryDark">@color/androlua7</item>
+        <item name="android:colorAccent">@color/androlua7</item>
+		<item name="android:statusBarColor">@color/androlua7</item>
+	</style>
+
+	<style name="AndroLua8" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua8</item>
+        <item name="android:colorPrimaryDark">@color/androlua8</item>
+        <item name="android:colorAccent">@color/androlua8</item>
+		<item name="android:statusBarColor">@color/androlua8</item>
+	</style>
+
+	<style name="AndroLua9" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua9</item>
+        <item name="android:colorPrimaryDark">@color/androlua9</item>
+        <item name="android:colorAccent">@color/androlua9</item>
+		<item name="android:statusBarColor">@color/androlua9</item>
+	</style>
+
+	<style name="AndroLua10" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua10</item>
+        <item name="android:colorPrimaryDark">@color/androlua10</item>
+        <item name="android:colorAccent">@color/androlua10</item>
+		<item name="android:statusBarColor">@color/androlua10</item>
+	</style>
+
+	<style name="AndroLua11" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua11</item>
+        <item name="android:colorPrimaryDark">@color/androlua11</item>
+        <item name="android:colorAccent">@color/androlua11</item>
+		<item name="android:statusBarColor">@color/androlua11</item>
+	</style>
+
+	<style name="AndroLua12" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua12</item>
+        <item name="android:colorPrimaryDark">@color/androlua12</item>
+        <item name="android:colorAccent">@color/androlua12</item>
+		<item name="android:statusBarColor">@color/androlua12</item>
+	</style>
+
+	<style name="AndroLua13" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua13</item>
+        <item name="android:colorPrimaryDark">@color/androlua13</item>
+        <item name="android:colorAccent">@color/androlua13</item>
+		<item name="android:statusBarColor">@color/androlua13</item>
+	</style>
+
+	<style name="AndroLua14" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua14</item>
+        <item name="android:colorPrimaryDark">@color/androlua14</item>
+        <item name="android:colorAccent">@color/androlua14</item>
+		<item name="android:statusBarColor">@color/androlua14</item>
+	</style>
+
+	<style name="AndroLua15" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua15</item>
+        <item name="android:colorPrimaryDark">@color/androlua15</item>
+        <item name="android:colorAccent">@color/androlua15</item>
+		<item name="android:statusBarColor">@color/androlua15</item>
+	</style>
+
+	<style name="AndroLua16" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua16</item>
+        <item name="android:colorPrimaryDark">@color/androlua16</item>
+        <item name="android:colorAccent">@color/androlua16</item>
+		<item name="android:statusBarColor">@color/androlua16</item>
+	</style>
+
+	<style name="AndroLua17" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua17</item>
+        <item name="android:colorPrimaryDark">@color/androlua17</item>
+        <item name="android:colorAccent">@color/androlua17</item>
+		<item name="android:statusBarColor">@color/androlua17</item>
+	</style>
+
+	<style name="AndroLua18" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua18</item>
+        <item name="android:colorPrimaryDark">@color/androlua18</item>
+        <item name="android:colorAccent">@color/androlua18</item>
+		<item name="android:statusBarColor">@color/androlua18</item>
+	</style>
+
+	<style name="AndroLua19" parent="@android:style/Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/androlua19</item>
+        <item name="android:colorPrimaryDark">@color/androlua19</item>
+        <item name="android:colorAccent">@color/androlua19</item>
+		<item name="android:statusBarColor">@color/androlua19</item>
+	</style>
 </resources>

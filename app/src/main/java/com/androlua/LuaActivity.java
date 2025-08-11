@@ -3,13 +3,18 @@ package com.androlua;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.AlertDialog;
 import android.app.Fragment;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.FileProvider;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.pm.PackageInstaller;
+import android.content.pm.PackageManager;
 import android.content.pm.ShortcutInfo;
 import android.content.pm.ShortcutManager;
 import android.content.res.AssetManager;
@@ -31,7 +36,6 @@ import android.os.Message;
 import android.os.StrictMode;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
-import android.text.style.ClickableSpan;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.ContextMenu;
@@ -51,6 +55,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.baidu.mobstat.StatService;
 import com.luajava.JavaFunction;
 import com.luajava.LuaException;
 import com.luajava.LuaObject;
@@ -390,6 +395,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
 
     public void setFragment(Fragment fragment) {
         isSetViewed = true;
+        setContentView(new View(this));
         getFragmentManager().beginTransaction()
                 .replace(android.R.id.content, fragment).commit();
     }
@@ -414,9 +420,6 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         gclist.add(obj);
     }
 
-    public Uri getUriForPath(String path) {
-        return FileProvider.getUriForFile(this, getPackageName(), new File(path));
-    }
 
     public long test(String src, int n) {
         long t=System.currentTimeMillis();
@@ -424,6 +427,9 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
             L.LdoString(src);
         }
         return System.currentTimeMillis()-t;
+    }
+    public Uri getUriForPath(String path) {
+        return FileProvider.getUriForFile(this, getPackageName(), new File(path));
     }
 
     public Uri getUriForFile(File path) {
@@ -826,7 +832,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         startActivity(Intent.createChooser(share, file.getName()));
     }
 
-    private String getType(@NonNull File file) {
+    private String getType(File file) {
         int lastDot = file.getName().lastIndexOf(46);
         if (lastDot >= 0) {
             String extension = file.getName().substring(lastDot + 1);
@@ -844,7 +850,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         share.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         share.setDataAndType(getUriForFile(file), getType(file));
         share.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(Intent.createChooser(share, file.getName()));
+        startActivity(share);
     }
 
     public Intent registerReceiver(LuaBroadcastReceiver receiver, IntentFilter filter) {
@@ -867,6 +873,16 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     @Override
+    public void unregisterReceiver(BroadcastReceiver receiver) {
+        try{
+            super.unregisterReceiver(receiver);
+        } catch (Exception e){
+            Log.i("lua", "unregisterReceiver: "+receiver);
+            e.printStackTrace();
+        }
+     }
+
+    @Override
     public void onReceive(Context context, Intent intent) {
         // TODO: Implement this method
         runFunc("onReceive", context, intent);
@@ -883,6 +899,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     protected void onStart() {
         super.onStart();
         runFunc("onStart");
+        StatService.onPageStart(this, pageName);
     }
 
     @Override
@@ -901,6 +918,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     protected void onStop() {
         super.onStop();
         runFunc("onStop");
+        StatService.onPageEnd(this, pageName);
     }
 
     public static LuaActivity getActivity(String name) {
@@ -945,6 +963,12 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         }
         runFunc("onActivityResult", requestCode, resultCode, data);
         super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        runFunc("onRequestPermissionsResult",requestCode,permissions,grantResults);
     }
 
     @Override
@@ -1075,6 +1099,11 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     @Override
+    public Object getSharedData() {
+        return LuaApplication.getInstance().getSharedData();
+    }
+
+    @Override
     public Object getSharedData(String key) {
         return LuaApplication.getInstance().getSharedData(key);
     }
@@ -1162,7 +1191,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     public void newActivity(String path) throws FileNotFoundException {
-        newActivity(1, path, null);
+        newActivity(1, path, new Object[0]);
     }
 
     public void newActivity(String path, Object[] arg) throws FileNotFoundException {
@@ -1170,7 +1199,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     public void newActivity(int req, String path) throws FileNotFoundException {
-        newActivity(req, path, null);
+        newActivity(req, path, new Object[0]);
     }
 
     public void newActivity(int req, String path, Object[] arg) throws FileNotFoundException {
@@ -1224,7 +1253,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     public void newActivity(String path, int in, int out) throws FileNotFoundException {
-        newActivity(1, path, in, out, null);
+        newActivity(1, path, in, out, new Object[0]);
     }
 
     public void newActivity(String path, int in, int out, Object[] arg) throws FileNotFoundException {
@@ -1232,7 +1261,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     public void newActivity(int req, String path, int in, int out) throws FileNotFoundException {
-        newActivity(req, path, in, out, null);
+        newActivity(req, path, in, out, new Object[0]);
     }
 
     public void newActivity(int req, String path, int in, int out, Object[] arg) throws FileNotFoundException {
@@ -1302,7 +1331,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     public LuaThread newThread(LuaObject func) throws LuaException {
-        return newThread(func, null);
+        return newThread(func, new Object[0]);
     }
 
     public LuaThread newThread(LuaObject func, Object[] arg) throws LuaException {
@@ -1311,7 +1340,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     public LuaTimer newTimer(LuaObject func) throws LuaException {
-        return newTimer(func, null);
+        return newTimer(func, new Object[0]);
     }
 
     public LuaTimer newTimer(LuaObject func, Object[] arg) throws LuaException {
@@ -1351,7 +1380,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     public LuaThread thread(LuaObject func) throws LuaException {
-        LuaThread thread = newThread(func, null);
+        LuaThread thread = newThread(func, new Object[0]);
         thread.start();
         return thread;
     }
@@ -1363,7 +1392,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     public LuaTimer timer(LuaObject func, long period) throws LuaException {
-        return timer(func, 0, period, null);
+        return timer(func, 0, period, new Object[0]);
     }
 
     public LuaTimer timer(LuaObject func, long period, Object[] arg) throws LuaException {
@@ -1371,7 +1400,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
     }
 
     public LuaTimer timer(LuaObject func, long delay, long period) throws LuaException {
-        return timer(func, delay, period, null);
+        return timer(func, delay, period, new Object[0]);
     }
 
     public LuaTimer timer(LuaObject func, long delay, long period, Object[] arg) throws LuaException {
@@ -1519,6 +1548,19 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
                 L.setUpValue(-2, 1);
                 ok = L.pcall(0, 0, 0);
                 if (ok == 0) {
+                    if (sKey == null) {
+                        LuaObject key = env.getField("app_key");
+                        if (key.isString()) {
+                            sKey = key.toString();
+                            StatService.setAppKey(key.toString());
+                        }
+                        LuaObject channel = env.getField("app_channel");
+                        if (channel.isString())
+                            StatService.setAppChannel(this, channel.toString(), true);
+                        StatService.setOn(this, StatService.EXCEPTION_LOG);
+                    }
+
+
                     LuaObject title = env.getField("appname");
                     if (title.isString())
                         setTitle(title.getString());
@@ -1634,7 +1676,7 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         return null;
     }
 
-    public Object doAsset(String name, Object... args) {
+    public Object doAsset(String name, Object[] args) {
         int ok = 0;
         try {
             byte[] bytes = readAsset(name);
@@ -1773,6 +1815,15 @@ public class LuaActivity extends Activity implements LuaBroadcastReceiver.OnRece
         myOutput.flush();
         myInput.close();
         myOutput.close();
+    }
+
+    public void showLogs(){
+        new AlertDialog.Builder(this)
+                .setTitle("Logs")
+                .setAdapter(adapter,null)
+                .setPositiveButton(android.R.string.ok,null)
+                .create()
+                .show();
     }
 
     //显示信息

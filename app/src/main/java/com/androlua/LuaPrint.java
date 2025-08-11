@@ -8,7 +8,8 @@ public class LuaPrint extends JavaFunction {
     private LuaContext mLuaContext;
     private StringBuilder output = new StringBuilder();
 
-    public LuaPrint(LuaContext luaContext, LuaState L) {
+    public
+    LuaPrint(LuaContext luaContext, LuaState L) {
         super(L);
         this.L = L;
         mLuaContext = luaContext;
@@ -31,7 +32,7 @@ public class LuaPrint extends JavaFunction {
             } else if (stype.equals("boolean")) {
                 val = L.toBoolean(i) ? "true" : "false";
             } else {
-                val = L.toString(i);
+                val = L.LtoString(i);
             }
             if (val == null)
                 val = stype;

@@ -8,6 +8,9 @@
  */
 package com.myopicmobile.textwarrior.common;
 
+import android.graphics.Rect;
+
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -318,6 +321,12 @@ public class DocumentProvider implements java.lang.CharSequence
 		// TODO: Implement this method
 		return _theText.toString();
 	}
-	
-	
+
+
+	public void setLines(ArrayList<Rect> lines) {
+		_theText.setLines(lines);
+	}
+	public ArrayList<Rect> getLines() {
+		return _theText.getLines();
+	}
 }

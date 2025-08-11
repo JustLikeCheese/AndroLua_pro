@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "lua.h"
 
@@ -101,10 +102,17 @@
 */
 
 #if !defined(l_fseek)		/* { */
+#ifdef __ANDROID__
+#include <sys/types.h>
+#include <dirent.h>
+#define l_fseek(f,o,w)		fseek(f,o,w)
+#define l_ftell(f)		ftell(f)
+#define l_seeknum		long
 
-#if defined(LUA_USE_POSIX)	/* { */
+#elif defined(LUA_USE_POSIX)	/* { */
 
 #include <sys/types.h>
+#include <dirent.h>
 
 #define l_fseek(f,o,w)		fseeko(f,o,w)
 #define l_ftell(f)		ftello(f)
@@ -147,6 +155,19 @@ typedef luaL_Stream LStream;
 
 
 static int io_type (lua_State *L) {
+    if(lua_type(L,1)==LUA_TSTRING){
+        const char *path = luaL_checkstring(L, 1);
+        struct stat s;
+        if(stat(path,&s)!=0){
+            return luaL_fileresult(L,0,path);
+        }
+        if(S_ISDIR(s.st_mode))
+            lua_pushstring(L,"dir");
+        else
+            lua_pushstring(L,"file");
+        return 1;
+    }
+
   LStream *p;
   luaL_checkany(L, 1);
   p = (LStream *)luaL_testudata(L, 1, LUA_FILEHANDLE);
@@ -312,6 +333,7 @@ static int g_iofile (lua_State *L, const char *f, const char *mode) {
 
 
 static int io_input (lua_State *L) {
+  return g_iofile(L, IO_INPUT, "r");
   return g_iofile(L, IO_INPUT, "r");
 }
 
@@ -519,6 +541,53 @@ static int read_chars (lua_State *L, FILE *f, size_t n) {
   return (nr > 0);  /* true iff read something */
 }
 
+static int read_int (lua_State *L, FILE *f) {
+  size_t nr;  /* number of chars actually read */
+  int32_t *p = malloc(sizeof(int32_t));
+  nr = fread(p, sizeof(int32_t), 1, f);  /* try to read 'n' chars */
+  lua_pushinteger(L,*p);
+  return (nr > 0);  /* true iff read something */
+}
+
+static int read_uint (lua_State *L, FILE *f) {
+  size_t nr;  /* number of chars actually read */
+  uint32_t *p = malloc(sizeof(uint32_t));
+  nr = fread(p, sizeof(uint32_t), 1, f);  /* try to read 'n' chars */
+  lua_pushinteger(L,*p);
+  return (nr > 0);  /* true iff read something */
+}
+
+static int read_int16 (lua_State *L, FILE *f) {
+  size_t nr;  /* number of chars actually read */
+  int16_t *p = malloc(sizeof(int16_t));
+  nr = fread(p, sizeof(int16_t), 1, f);  /* try to read 'n' chars */
+  lua_pushinteger(L,*p);
+  return (nr > 0);  /* true iff read something */
+}
+
+static int read_uint16 (lua_State *L, FILE *f) {
+  size_t nr;  /* number of chars actually read */
+  uint16_t *p = malloc(sizeof(uint16_t));
+  nr = fread(p, sizeof(uint16_t), 1, f);  /* try to read 'n' chars */
+  lua_pushinteger(L,*p);
+  return (nr > 0);  /* true iff read something */
+}
+
+static int read_int8 (lua_State *L, FILE *f) {
+  size_t nr;  /* number of chars actually read */
+  int8_t *p = malloc(sizeof(int8_t));
+  nr = fread(p, sizeof(int8_t), 1, f);  /* try to read 'n' chars */
+  lua_pushinteger(L,*p);
+  return (nr > 0);  /* true iff read something */
+}
+
+static int read_uint8 (lua_State *L, FILE *f) {
+  size_t nr;  /* number of chars actually read */
+  uint8_t *p = malloc(sizeof(uint8_t));
+  nr = fread(p, sizeof(uint8_t), 1, f);  /* try to read 'n' chars */
+  lua_pushinteger(L,*p);
+  return (nr > 0);  /* true iff read something */
+}
 
 static int g_read (lua_State *L, FILE *f, int first) {
   int nargs = lua_gettop(L) - 1;
@@ -541,6 +610,24 @@ static int g_read (lua_State *L, FILE *f, int first) {
         const char *p = luaL_checkstring(L, n);
         if (*p == '*') p++;  /* skip optional '*' (for compatibility) */
         switch (*p) {
+          case 'i':  /* number */
+            success = read_int(L, f);
+            break;
+          case 'I':  /* number */
+            success = read_uint(L, f);
+            break;
+          case 's':  /* number */
+            success = read_int16(L, f);
+            break;
+          case 'S':  /* number */
+            success = read_uint16(L, f);
+            break;
+          case 'b':  /* number */
+            success = read_int8(L, f);
+            break;
+          case 'B':  /* number */
+            success = read_uint8(L, f);
+            break;
           case 'n':  /* number */
             success = read_number(L, f);
             break;
@@ -574,6 +661,16 @@ static int io_read (lua_State *L) {
   return g_read(L, getiofile(L, IO_INPUT), 1);
 }
 
+static int io_readall (lua_State *L) {
+  const char *filename = luaL_checkstring(L, 1);
+  const char *mode = "r";
+  FILE *f = fopen(filename, mode);
+  if(f==NULL)
+    return luaL_fileresult(L, 0, filename);
+  read_all(L,f);
+  fclose(f);
+  return 1;
+}
 
 static int f_read (lua_State *L) {
   return g_read(L, tofile(L), 2);
@@ -685,6 +782,194 @@ static int f_flush (lua_State *L) {
   return luaL_fileresult(L, fflush(tofile(L)) == 0, NULL);
 }
 
+static int io_info (lua_State *L) {
+  const char *path = luaL_checkstring(L, 1);
+  struct stat s;
+  if(stat(path,&s)!=0){
+    return luaL_fileresult(L,0,path);
+  }
+  lua_newtable(L);
+  lua_pushinteger(L,s.st_size);
+  lua_setfield(L,-2,"size");
+  lua_pushinteger(L,s.st_atim.tv_sec);
+  lua_setfield(L,-2,"atime");
+  lua_pushinteger(L,s.st_ctim.tv_sec);
+  lua_setfield(L,-2,"ctime");
+  lua_pushinteger(L,s.st_mtim.tv_sec);
+  lua_setfield(L,-2,"mtime");
+  lua_pushinteger(L,s.st_mode & S_IFMT);
+  lua_setfield(L,-2,"mode");
+  return 1;
+}
+
+static int io_isdir (lua_State *L) {
+    const char *path = luaL_checkstring(L, 1);
+    struct stat s;
+    if(stat(path,&s)!=0){
+        return luaL_fileresult(L,0,path);
+    }
+    lua_pushboolean(L,S_ISDIR(s.st_mode));
+    return 1;
+}
+
+static int io_mkdir (lua_State *L) {
+    const char *path = luaL_checkstring(L, 1);
+    mode_t mode= (mode_t) luaL_optinteger(L, 2, 777);
+    if(mkdir(path,mode)!=0){
+        return luaL_fileresult(L,0,path);
+    }
+    lua_pushboolean(L,1);
+    return 1;
+}
+
+
+
+
+#define DIR_METATABLE "directory"
+typedef struct dir_data {
+    int  closed;
+#ifdef _WIN32
+    intptr_t hFile;
+        char pattern[MAX_PATH+1];
+#else
+    DIR *dir;
+#endif
+} dir_data;
+
+/*
+** Directory iterator
+*/
+static int dir_iter (lua_State *L) {
+#ifdef _WIN32
+  struct _finddata_t c_file;
+#else
+  struct dirent *entry;
+#endif
+  dir_data *d = (dir_data *)luaL_checkudata (L, 1, DIR_METATABLE);
+  luaL_argcheck (L, d->closed == 0, 1, "closed directory");
+#ifdef _WIN32
+  if (d->hFile == 0L) { /* first entry */
+                if ((d->hFile = _findfirst (d->pattern, &c_file)) == -1L) {
+                        lua_pushnil (L);
+                        lua_pushstring (L, strerror (errno));
+                        d->closed = 1;
+                        return 2;
+                } else {
+                        lua_pushstring (L, c_file.name);
+                        return 1;
+                }
+        } else { /* next entry */
+                if (_findnext (d->hFile, &c_file) == -1L) {
+                        /* no more entries => close directory */
+                        _findclose (d->hFile);
+                        d->closed = 1;
+                        return 0;
+                } else {
+                        lua_pushstring (L, c_file.name);
+                        return 1;
+                }
+        }
+#else
+  if ((entry = readdir (d->dir)) != NULL) {
+    lua_pushstring (L, entry->d_name);
+    return 1;
+  } else {
+    /* no more entries => close directory */
+    closedir (d->dir);
+    d->closed = 1;
+    return 0;
+  }
+#endif
+}
+
+
+/*
+** Closes directory iterators
+*/
+static int dir_close (lua_State *L) {
+  dir_data *d = (dir_data *)lua_touserdata (L, 1);
+#ifdef _WIN32
+  if (!d->closed && d->hFile) {
+                _findclose (d->hFile);
+        }
+#else
+  if (!d->closed && d->dir) {
+    closedir (d->dir);
+  }
+#endif
+  d->closed = 1;
+  return 0;
+}
+
+
+/*
+** Factory of directory iterators
+*/
+static int dir_iter_factory (lua_State *L) {
+  const char *path = luaL_checkstring (L, 1);
+  dir_data *d;
+  d = (dir_data *) lua_newuserdata (L, sizeof(dir_data));
+  luaL_getmetatable (L, DIR_METATABLE);
+  lua_setmetatable (L, -2);
+  d->closed = 0;
+#ifdef _WIN32
+  d->hFile = 0L;
+        if (strlen(path) > MAX_PATH-2)
+          luaL_error (L, "path too long: %s", path);
+        else
+          sprintf (d->pattern, "%s/*", path);
+#else
+  d->dir = opendir (path);
+  if (d->dir == NULL)
+    luaL_error (L, "cannot open %s: %s", path, strerror (errno));
+#endif
+  return 1;
+}
+
+static int dir_ls_factory (lua_State *L) {
+    lua_pushcfunction (L, dir_iter);
+    lua_insert(L,1);
+    return 2;
+}
+static int dir_ls (lua_State *L) {
+    const char *path = luaL_checkstring (L, 1);
+    DIR *dir = opendir (path);
+    if (dir == NULL)
+        return luaL_fileresult(L,0,path);
+    lua_newtable(L);
+    struct dirent *entry;
+    int n=1;
+    while ((entry = readdir (dir)) != NULL) {
+        lua_pushstring(L, entry->d_name);
+        lua_seti(L,2,n++);
+    }
+    closedir(dir);
+    return 1;
+}
+/*
+** Creates directory metatable.
+*/
+static int dir_create_meta (lua_State *L) {
+  luaL_newmetatable (L, DIR_METATABLE);
+
+  /* Method table */
+  lua_newtable(L);
+  lua_pushcfunction (L, dir_iter);
+  lua_setfield(L, -2, "next");
+  lua_pushcfunction (L, dir_close);
+  lua_setfield(L, -2, "close");
+    lua_pushcfunction (L, dir_ls_factory);
+    lua_setfield(L, -2, "ls");
+
+  /* Metamethods */
+  lua_setfield(L, -2, "__index");
+  lua_pushcfunction (L, dir_close);
+  lua_setfield (L, -2, "__gc");
+    lua_pop(L, 1);  /* pop new metatable */
+    return 0;
+}
+
+
 
 /*
 ** functions for 'io' library
@@ -701,6 +986,12 @@ static const luaL_Reg iolib[] = {
   {"tmpfile", io_tmpfile},
   {"type", io_type},
   {"write", io_write},
+  {"readall", io_readall},
+  {"info", io_info},
+  {"mkdir", io_mkdir},
+  {"isdir", io_isdir},
+  {"dir", dir_iter_factory},
+  {"ls", dir_ls},
   {NULL, NULL}
 };
 
@@ -759,6 +1050,7 @@ static void createstdfile (lua_State *L, FILE *f, const char *k,
 LUAMOD_API int luaopen_io (lua_State *L) {
   luaL_newlib(L, iolib);  /* new module */
   createmeta(L);
+  dir_create_meta(L);
   /* create (and set) default files */
   createstdfile(L, stdin, IO_INPUT, "stdin");
   createstdfile(L, stdout, IO_OUTPUT, "stdout");

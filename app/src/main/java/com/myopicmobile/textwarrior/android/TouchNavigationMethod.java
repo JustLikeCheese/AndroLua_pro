@@ -404,6 +404,7 @@ public class TouchNavigationMethod extends GestureDetector.SimpleOnGestureListen
         return _caretBloat;
     }
 
+    @SuppressWarnings("deprecation")
     final protected int getPointerId(MotionEvent e) {
         return (e.getAction() & MotionEvent.ACTION_POINTER_ID_MASK)
                 >> MotionEvent.ACTION_POINTER_ID_SHIFT;
@@ -429,7 +430,7 @@ public class TouchNavigationMethod extends GestureDetector.SimpleOnGestureListen
         return true;
     }
 
-    final private boolean isDragSelect() {
+    private boolean isDragSelect() {
         return false;
     }
 

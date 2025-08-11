@@ -852,7 +852,7 @@ lb64decode(lua_State *L) {
 		uint32_t v;
 		switch (padding) {
 		case 0:
-			v = (unsigned)c[0] << 18 | c[1] << 12 | c[2] << 6 | c[3];
+			v = (uint32_t)c[0] << 18 | c[1] << 12 | c[2] << 6 | c[3];
 			buffer[output] = v >> 16;
 			buffer[output+1] = (v >> 8) & 0xff;
 			buffer[output+2] = v & 0xff;
@@ -862,7 +862,7 @@ lb64decode(lua_State *L) {
 			if (c[3] != -2 || (c[2] & 3)!=0) {
 				return luaL_error(L, "Invalid base64 text");
 			}
-			v = (unsigned)c[0] << 10 | c[1] << 4 | c[2] >> 2 ;
+			v = (uint32_t)c[0] << 10 | c[1] << 4 | c[2] >> 2 ;
 			buffer[output] = v >> 8;
 			buffer[output+1] = v & 0xff;
 			output += 2;
@@ -871,7 +871,7 @@ lb64decode(lua_State *L) {
 			if (c[3] != -2 || c[2] != -2 || (c[1] & 0xf) !=0)  {
 				return luaL_error(L, "Invalid base64 text");
 			}
-			v = (unsigned)c[0] << 2 | c[1] >> 4;
+			v = (uint32_t)c[0] << 2 | c[1] >> 4;
 			buffer[output] = v;
 			++ output;
 			break;

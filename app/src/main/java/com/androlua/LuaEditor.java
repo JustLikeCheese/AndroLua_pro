@@ -1,12 +1,16 @@
 package com.androlua;
 
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.content.*;
 import android.content.res.*;
 import android.graphics.*;
 import android.os.AsyncTask;
+import android.os.Build;
+import android.os.Bundle;
 import android.util.*;
 import android.view.*;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.*;
 import android.widget.RadioGroup.*;
 import android.widget.TextView.*;
@@ -15,6 +19,17 @@ import com.myopicmobile.textwarrior.android.*;
 import com.myopicmobile.textwarrior.common.*;
 
 import java.io.*;
+
+import static android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_EXTEND_SELECTION_BOOLEAN;
+import static android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT;
+import static android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT;
+import static android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE;
+import static android.view.accessibility.AccessibilityNodeInfo.ACTION_COPY;
+import static android.view.accessibility.AccessibilityNodeInfo.ACTION_CUT;
+import static android.view.accessibility.AccessibilityNodeInfo.ACTION_PASTE;
+import static android.view.accessibility.AccessibilityNodeInfo.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY;
+import static android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_SELECTION;
+import static android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_TEXT;
 
 public class LuaEditor extends FreeScrollingTextField {
 
@@ -93,6 +108,7 @@ public class LuaEditor extends FreeScrollingTextField {
                 addNames(cls);
             }
         }.execute();*/
+        PackageUtil.load(context);
     }
 
     @Override
@@ -171,7 +187,7 @@ public class LuaEditor extends FreeScrollingTextField {
         getColorScheme().setColor(ColorScheme.Colorable.COMMENT, color);
     }
 
-    public void setBackgoudColor(int color) {
+    public void setBackgroundColor(int color) {
         getColorScheme().setColor(ColorScheme.Colorable.BACKGROUND, color);
     }
 
@@ -546,6 +562,61 @@ public class LuaEditor extends FreeScrollingTextField {
         idx += mKeyword.length();
         moveCaret(idx);
         return true;
+    }
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    @Override
+    public boolean performAccessibilityAction(int action, Bundle arguments) {
+
+        switch (action) {
+            case AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY:
+                switch (arguments.getInt(AccessibilityNodeInfo.ACTION_ARGUMENT_MOVEMENT_GRANULARITY_INT)) {
+                    case AccessibilityNodeInfo.MOVEMENT_GRANULARITY_LINE:
+                        moveCaretDown();
+                        break;
+                    case AccessibilityNodeInfo.MOVEMENT_GRANULARITY_CHARACTER:
+                        moveCaretRight();
+                        break;
+                }
+                return true;
+            case ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY:
+                switch (arguments.getInt(AccessibilityNodeInfo.ACTION_ARGUMENT_MOVEMENT_GRANULARITY_INT)) {
+                    case AccessibilityNodeInfo.MOVEMENT_GRANULARITY_LINE:
+                        moveCaretUp();
+                        break;
+                    case AccessibilityNodeInfo.MOVEMENT_GRANULARITY_CHARACTER:
+                        moveCaretLeft();
+                        break;
+                }
+                return true;
+            case ACTION_SET_SELECTION:
+                if(arguments==null)
+                    return true;
+                int start = arguments.getInt(ACTION_ARGUMENT_SELECTION_START_INT, 0);
+                int end = arguments.getInt(ACTION_ARGUMENT_SELECTION_END_INT, 0);
+                boolean sel = arguments.getBoolean(ACTION_ARGUMENT_EXTEND_SELECTION_BOOLEAN, false);
+                if (sel)
+                    setSelectionRange(start, end);
+                else
+                    setSelection(start, end);
+                return true;
+            case ACTION_SET_TEXT:
+                selectText(false);
+                if(arguments==null)
+                    setText("",true);
+                else
+                    setText(arguments.getCharSequence(ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE),true);
+                return true;
+            case ACTION_PASTE:
+                paste();
+                return true;
+            case ACTION_COPY:
+                copy();
+                return true;
+            case ACTION_CUT:
+                cut();
+                return true;
+        }
+        return super.performAccessibilityAction(action, arguments);
     }
 
 }

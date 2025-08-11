@@ -30,9 +30,9 @@
 
 
 typedef struct {
-  lua_State *L;
-  ZIO *Z;
-  const char *name;
+    lua_State *L;
+    ZIO *Z;
+    const char *name;
 } LoadState;
 
 
@@ -86,7 +86,9 @@ static lua_Integer LoadInteger (LoadState *S) {
 
 
 static TString *LoadString (LoadState *S) {
-  size_t size = LoadByte(S);
+  //nirenr mod
+  //size_t size = LoadByte(S);
+  unsigned int size = LoadByte(S);
   if (size == 0xFF)
     LoadVar(S, size);
   if (size == 0)
@@ -126,24 +128,24 @@ static void LoadConstants (LoadState *S, Proto *f) {
     TValue *o = &f->k[i];
     int t = LoadByte(S);
     switch (t) {
-    case LUA_TNIL:
-      setnilvalue(o);
-      break;
-    case LUA_TBOOLEAN:
+      case LUA_TNIL:
+        setnilvalue(o);
+            break;
+      case LUA_TBOOLEAN:
       setbvalue(o, LoadByte(S));
-      break;
-    case LUA_TNUMFLT:
+            break;
+      case LUA_TNUMFLT:
       setfltvalue(o, LoadNumber(S));
-      break;
-    case LUA_TNUMINT:
+            break;
+      case LUA_TNUMINT:
       setivalue(o, LoadInteger(S));
-      break;
-    case LUA_TSHRSTR:
-    case LUA_TLNGSTR:
-      setsvalue2n(S->L, o, LoadString(S));
-      break;
-    default:
-      lua_assert(0);
+            break;
+      case LUA_TSHRSTR:
+      case LUA_TLNGSTR:
+        setsvalue2n(S->L, o, LoadString(S));
+            break;
+      default:
+        lua_assert(0);
     }
   }
 }
@@ -241,7 +243,9 @@ static void checkHeader (LoadState *S) {
     error(S, "format mismatch in");
   checkliteral(S, LUAC_DATA, "corrupted");
   checksize(S, int);
-  checksize(S, size_t);
+  //nirenr mod
+  //checksize(S, size_t);
+  checksize(S, unsigned int);
   checksize(S, Instruction);
   checksize(S, lua_Integer);
   checksize(S, lua_Number);

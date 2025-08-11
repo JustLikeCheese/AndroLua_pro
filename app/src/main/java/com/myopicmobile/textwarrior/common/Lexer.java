@@ -9,11 +9,15 @@
 package com.myopicmobile.textwarrior.common;
 
 import android.graphics.Rect;
+import android.util.Log;
 
 import com.androlua.LuaLexer;
 import com.androlua.LuaTokenTypes;
 
+import org.luaj.vm2.compiler.LexState;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 //import static com.myopicmobile.textwarrior.common.LuaTokenTypes;
 
@@ -28,6 +32,13 @@ public class Lexer {
     public final static int OPERATOR = 2;
     public final static int NAME = 3;
     public final static int LITERAL = 4;
+    public final static int GLOBAL = 5;
+    public final static int UPVAL = 6;
+    public final static int LOCAL = 7;
+    public final static int STRING = 8;
+    public final static int COMMENT = 9;
+
+
     /**
      * A word that starts with a special symbol, inclusive.
      * Examples:
@@ -122,17 +133,19 @@ public class Lexer {
     }
 
     public void tokenize(DocumentProvider hDoc) {
+        LexState.errormsg=null;
         if (!Lexer.getLanguage().isProgLang()) {
             return;
         }
 
         //tokenize will modify the state of hDoc; make a copy
         setDocument(new DocumentProvider(hDoc));
-        if (_workerThread == null) {
+        cancelTokenize();
+        try {
             _workerThread = new LexThread(this);
             _workerThread.start();
-        } else {
-            _workerThread.restart();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -185,6 +198,8 @@ public class Lexer {
         public LexThread(Lexer p) {
             _lexManager = p;
             _abort = new Flag();
+            _tokens = new ArrayList<>();
+            _tokens.add(new Pair(_hDoc.length(), Lexer.NORMAL));
         }
 
         @Override
@@ -192,10 +207,16 @@ public class Lexer {
             do {
                 rescan = false;
                 _abort.clear();
-                if (Lexer.getLanguage() instanceof LanguageLua)
-                    tokenize();
-                else
-                    tokenize2();
+                try {
+                    if (Lexer.getLanguage() instanceof LanguageLua)
+                        tokenize();
+                    else
+                        tokenize2();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    _tokens = new ArrayList<>();
+                    rescan = false;
+                }
             }
             while (rescan);
 
@@ -223,10 +244,22 @@ public class Lexer {
             ArrayList<Rect> lines = new ArrayList<>(8196);
             ArrayList<Rect> lineStacks = new ArrayList<>(8196);
             ArrayList<Rect> lineStacks2 = new ArrayList<>(8196);
+            if (rowCount*5 < maxRow){
+                if(!LuaParser.lexer(new DocumentProvider(hDoc),_abort)&&_tokens!=null&&_tokens.size()>4) {
+                    //Log.i("luaj", "tokenize: "+_tokens.size());
+                    _abort.set();
+                    return;
+                }
+            }else {
+                LuaParser.reset();
+            }
+            HashMap<String, ArrayList<Pair>> locals = LuaParser.getLocalMap();
+            HashMap<String, ArrayList<Pair>> values = LuaParser.getValueMap();
 
             LuaLexer lexer = new LuaLexer(hDoc);
             Language language = Lexer.getLanguage();
             language.clearUserWord();
+            LuaParser.clearUserWord();
             try {
                 int idx = 0;
 
@@ -247,11 +280,16 @@ public class Lexer {
                     if (type == null)
                         break;
                     int len = lexer.yylength();
-
+                    idx += len;
                     if (isModule && lastType == LuaTokenTypes.STRING && type != LuaTokenTypes.STRING) {
                         String mod = bul.toString();
-                        if (bul.length() > 2)
-                            language.addUserWord(mod.substring(1, mod.length() - 1));
+                        if (bul.length() > 2) {
+                            String m = mod.substring(1, mod.length() - 1);
+                            String[] ms = m.split("\\.|\\$");
+                            String na = ms[ms.length - 1];
+                            language.addUserWord(na);
+                            LuaParser.addUserWord(na + " :import");
+                        }
                         bul = new StringBuilder();
                         isModule = false;
                     }
@@ -263,6 +301,10 @@ public class Lexer {
                     lastLen = len;
                     switch (type) {
                         case DO:
+                            if (lastType == LuaTokenTypes.DOT) {
+                                tokens.add(new Pair(len, NORMAL));
+                                break;
+                            }
                             if (hasDo) {
                                 lineStacks.add(new Rect(lexer.yychar(), lexer.yyline(), 0, lexer.yyline()));
                             }
@@ -272,6 +314,10 @@ public class Lexer {
                             break;
                         case WHILE:
                         case FOR:
+                            if (lastType == LuaTokenTypes.DOT) {
+                                tokens.add(new Pair(len, NORMAL));
+                                break;
+                            }
                             hasDo = false;
                             lineStacks.add(new Rect(lexer.yychar(), lexer.yyline(), 0, lexer.yyline()));
                             //关键字
@@ -280,17 +326,27 @@ public class Lexer {
                         case FUNCTION:
                         case IF:
                         case SWITCH:
+                        //case TRY:
+                        case WHEN:
+                            if (lastType == LuaTokenTypes.DOT) {
+                                tokens.add(new Pair(len, NORMAL));
+                                break;
+                            }
                             lineStacks.add(new Rect(lexer.yychar(), lexer.yyline(), 0, lexer.yyline()));
                             //关键字
                             tokens.add(new Pair(len, KEYWORD));
                             break;
                         case END:
+                            if (lastType == LuaTokenTypes.DOT) {
+                                tokens.add(new Pair(len, NORMAL));
+                                break;
+                            }
                             int size = lineStacks.size();
                             if (size > 0) {
                                 Rect rect = lineStacks.remove(size - 1);
                                 rect.bottom = lexer.yyline();
                                 rect.right = lexer.yychar();
-                                if (rect.bottom - rect.top>1)
+                                if (rect.bottom - rect.top > 1)
                                     lines.add(rect);
                             }
                             //关键字
@@ -318,9 +374,14 @@ public class Lexer {
                         case CONTINUE:
                         case GOTO:
                         case LAMBDA:
-                        case WHEN:
                         case DEFER:
+                        //case CATCH:
+                        //case FINALLY:
                             //关键字
+                            if (lastType == LuaTokenTypes.DOT) {
+                                tokens.add(new Pair(len, NORMAL));
+                                break;
+                            }
                             tokens.add(new Pair(len, KEYWORD));
                             break;
                         case LCURLY:
@@ -334,7 +395,7 @@ public class Lexer {
                                 Rect rect = lineStacks2.remove(size2 - 1);
                                 rect.bottom = lexer.yyline();
                                 rect.right = lexer.yychar();
-                                if (rect.bottom - rect.top>1)
+                                if (rect.bottom - rect.top > 1)
                                     lines.add(rect);
                             }
                             //符号
@@ -356,7 +417,7 @@ public class Lexer {
                             if (rowCount > maxRow)
                                 break;
 
-                            if (lastName.equals("require"))
+                            if (lastName.equals("require") || lastName.equals("import"))
                                 isModule = true;
 
                             if (isModule)
@@ -367,16 +428,20 @@ public class Lexer {
                                 tokens.add(new Pair(len, NORMAL));
                                 break;
                             }
+
+
                             if (lastType2 == LuaTokenTypes.NUMBER) {
-                                Pair p = tokens.get(tokens.size()-1);
+                                Pair p = tokens.get(tokens.size() - 1);
                                 p.setSecond(NORMAL);
-                                p.setFirst(p.getFirst()+len);
+                                p.setFirst(p.getFirst() + len);
+                                break;
                             }
                             String name = lexer.yytext();
                             if (lastType == LuaTokenTypes.FUNCTION) {
                                 //函数名
                                 tokens.add(new Pair(len, LITERAL));
                                 language.addUserWord(name);
+                                LuaParser.addUserWord(name + " :function");
                             } else if (language.isUserWord(name)) {
                                 tokens.add(new Pair(len, LITERAL));
                             } else if (lastType == LuaTokenTypes.GOTO || lastType == LuaTokenTypes.AT) {
@@ -394,15 +459,51 @@ public class Lexer {
                                 tokens.add(new Pair(len, NORMAL));
                             }
 
-                            if (lastType == LuaTokenTypes.ASSIGN && name.equals("require")) {
-                                language.addUserWord(lastName);
-                                if (lastNameIdx>=0) {
-                                    Pair p = tokens.get(lastNameIdx-1);
-                                    p.setSecond(LITERAL);
-                                    lastNameIdx=-1;
+                            if (lastType != LuaTokenTypes.DOT) {
+                                boolean loc = false;
+                                /*if (locals.containsKey(name)) {
+                                    ArrayList<Pair> ls = locals.get(name);
+                                    for (Pair l : ls) {
+                                        if (l.getFirst() == idx) {
+                                            Pair p = tokens.get(tokens.size() - 1);
+                                            p.setSecond(LOCAL);
+                                            loc = true;
+                                            break;
+                                        }
+                                    }
+                                }*/
+                                if (!loc && values.containsKey(name)) {
+                                    ArrayList<Pair> ls = values.get(name);
+                                    for (Pair l : ls) {
+                                        if (l.getFirst() == idx) {
+                                            Pair p = tokens.get(tokens.size() - 1);
+                                            int tp = l.getSecond();
+                                            if (tp == LexState.VVOID) {
+                                                if (p.getSecond() == NORMAL)
+                                                    p.setSecond(GLOBAL);
+                                                break;
+                                            } else if (tp == LexState.VUPVAL) {
+                                                p.setSecond(UPVAL);
+                                                break;
+                                            } else if (tp == LexState.VLOCAL) {
+                                                p.setSecond(LOCAL);
+                                                break;
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                            lastNameIdx=tokens.size();
+
+                            if (lastType == LuaTokenTypes.ASSIGN && name.equals("require")) {
+                                language.addUserWord(lastName);
+                                LuaParser.addUserWord(lastName + " :require");
+                                if (lastNameIdx >= 0) {
+                                    Pair p = tokens.get(lastNameIdx - 1);
+                                    p.setSecond(LITERAL);
+                                    lastNameIdx = -1;
+                                }
+                            }
+                            lastNameIdx = tokens.size();
                             lastName = name;
                             break;
                         case SHORT_COMMENT:
@@ -418,7 +519,7 @@ public class Lexer {
                         default:
                             tokens.add(pair = new Pair(len, NORMAL));
                     }
-                    lastType3=lastType;
+                    lastType3 = lastType;
                     if (type != LuaTokenTypes.WHITE_SPACE
                         //&& type != LuaTokenTypes.NEWLINE && type != LuaTokenTypes.NL_BEFORE_LONGSTRING
                             ) {
@@ -427,7 +528,6 @@ public class Lexer {
                     lastType2 = type;
                     if (pair != null)
                         lastPair = pair;
-                    idx += len;
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -435,7 +535,7 @@ public class Lexer {
             }
             if (tokens.isEmpty()) {
                 // return value cannot be empty
-                tokens.add(new Pair(0, NORMAL));
+                tokens.add(new Pair(hDoc.length(), NORMAL));
             }
             language.updateUserWord();
             mLines = lines;

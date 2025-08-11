@@ -6,11 +6,13 @@
 * The penalty of calling select to avoid busy-wait is only paid when
 * the I/O call fail in the first place.
 \*=========================================================================*/
-#include <string.h>
-#include <signal.h>
+#include "luasocket.h"
 
 #include "socket.h"
 #include "pierror.h"
+
+#include <string.h>
+#include <signal.h>
 
 /*-------------------------------------------------------------------------*\
 * Wait for readable/writable/connected socket with timeout
@@ -76,7 +78,7 @@ int socket_waitfd(p_socket ps, int sw, p_timeout tm) {
 * Initializes module
 \*-------------------------------------------------------------------------*/
 int socket_open(void) {
-    /* instals a handler to ignore sigpipe or it will crash us */
+    /* installs a handler to ignore sigpipe or it will crash us */
     signal(SIGPIPE, SIG_IGN);
     return 1;
 }
@@ -211,6 +213,8 @@ int socket_send(p_socket ps, const char *data, size_t count,
         err = errno;
         /* EPIPE means the connection was closed */
         if (err == EPIPE) return IO_CLOSED;
+        /* EPROTOTYPE means the connection is being closed (on Yosemite!)*/
+        if (err == EPROTOTYPE) continue;
         /* we call was interrupted, just try again */
         if (err == EINTR) continue;
         /* if failed fatal reason, report error */
@@ -239,6 +243,7 @@ int socket_sendto(p_socket ps, const char *data, size_t count, size_t *sent,
         }
         err = errno;
         if (err == EPIPE) return IO_CLOSED;
+        if (err == EPROTOTYPE) continue;
         if (err == EINTR) continue;
         if (err != EAGAIN) return err;
         if ((err = socket_waitfd(ps, WAITFD_W, tm)) != IO_DONE) return err;
@@ -317,6 +322,8 @@ int socket_write(p_socket ps, const char *data, size_t count,
         err = errno;
         /* EPIPE means the connection was closed */
         if (err == EPIPE) return IO_CLOSED;
+        /* EPROTOTYPE means the connection is being closed (on Yosemite!)*/
+        if (err == EPROTOTYPE) continue;
         /* we call was interrupted, just try again */
         if (err == EINTR) continue;
         /* if failed fatal reason, report error */
@@ -410,7 +417,9 @@ const char *socket_strerror(int err) {
         case ECONNABORTED: return PIE_CONNABORTED;
         case ECONNRESET: return PIE_CONNRESET;
         case ETIMEDOUT: return PIE_TIMEDOUT;
-        default: return strerror(err);
+        default: {
+            return strerror(err);
+        }
     }
 }
 
@@ -431,7 +440,9 @@ const char *socket_gaistrerror(int err) {
         case EAI_FAMILY: return PIE_FAMILY;
         case EAI_MEMORY: return PIE_MEMORY;
         case EAI_NONAME: return PIE_NONAME;
+#ifdef EAI_OVERFLOW
         case EAI_OVERFLOW: return PIE_OVERFLOW;
+#endif
 #ifdef EAI_PROTOCOL
         case EAI_PROTOCOL: return PIE_PROTOCOL;
 #endif
@@ -441,4 +452,3 @@ const char *socket_gaistrerror(int err) {
         default: return gai_strerror(err);
     }
 }
-

@@ -197,14 +197,14 @@ public class LuaObject implements Serializable {
 
 	@Override
 	protected void finalize() {
-		Log.i("luaObject", "finalize: "+ref+";"+toString());
+		//Log.i("luaObject", "finalize: "+ref+";"+toString());
 		try {
 			synchronized (L) {
 				if (L.getPointer() != 0)
 					L.LunRef(LuaState.LUA_REGISTRYINDEX, ref);
 			}
 		}
-		catch (Exception e) {
+		catch (Throwable e) {
 			System.err.println("Unable to release object " + ref);
 		}
 	}
@@ -383,40 +383,6 @@ public class LuaObject implements Serializable {
 		}
 	}
 
-	@SuppressWarnings("unchecked")
-	public <T> T getObject(Class<T> type) {
-		push();
-		T obj=null;
-		try {
-			obj=(T)LuaJavaAPI.compareTypes(L,type,-1);
-		}
-		catch (LuaException e) {}
-		L.pop(1);
-		return obj;
-	}
-
-	@SuppressWarnings("unchecked")
-	public <T> T get(Object key, Class<T> type) {
-		// TODO: Implement this method
-		push();
-		T obj=null;
-		try {
-			L.pushObjectValue(key);
-			L.getTable(-2);
-			obj=(T)LuaJavaAPI.compareTypes(L,type,-1);
-			L.pop(1);
-		}
-		catch (LuaException e) {e.printStackTrace();}
-	    L.pop(1);
-		if(obj == null){
-			if(Number.class.isAssignableFrom(type))
-				obj=(T)Integer.valueOf(0);
-			if(Boolean.class.isAssignableFrom(type))
-				obj=(T)Boolean.valueOf(false);
-		}
-		return obj;
-	}
-
 	/**
 	 * If <code>this<code> is a table or userdata tries to set
 	 * a field value.
@@ -472,6 +438,10 @@ public class LuaObject implements Serializable {
 			int top = L.getTop();
 			push();
 			int nargs;
+			L.getGlobal("debug");
+			L.getField(-1, "traceback");
+			L.remove(-2);
+			L.insert(-2);
 			if (args != null) {
 				nargs = args.length;
 				for (int i = 0; i < nargs; i++) {
@@ -482,7 +452,7 @@ public class LuaObject implements Serializable {
 			else
 				nargs = 0;
 
-			int err = L.pcall(nargs, nres, 0);
+			int err = L.pcall(nargs, nres, -2-nargs);
 
 			if (err != 0) {
 				String str;

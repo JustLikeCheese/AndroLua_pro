@@ -354,7 +354,91 @@ static int lz_crc32(lua_State *L) {
     return lz_checksum_new(L, crc32, crc32_combine);
 }
 
+
+
+static int lz_filter_impl2(lua_State *L, z_stream* stream, int (*filter)(z_streamp, int), int (*end)(z_streamp), char* name) {
+    int flush = Z_FINISH, result;
+    luaL_Buffer buff;
+    size_t avail_in = 0;
+
+    /*  Do the actual deflate'ing: */
+    stream->next_in = lua_gettop(L) > 0 ?
+                      (unsigned char*)lua_tolstring(L, -1, &avail_in) :
+                      NULL;
+    stream->avail_in = (uInt)avail_in;
+
+    if ( ! stream->avail_in ) {
+        /*  Passed empty string, make it a noop instead of erroring out. */
+        lua_pushstring(L, "");
+        lua_pushboolean(L, 0);
+        lua_pushinteger(L, stream->total_in);
+        lua_pushinteger(L, stream->total_out);
+        lua_pushinteger(L, -1);
+        lua_pushstring(L, "passed empty string");
+        return 6;
+    }
+
+    luaL_buffinit(L, &buff);
+    do {
+        stream->next_out  = (unsigned char*)luaL_prepbuffer(&buff);
+        stream->avail_out = LUAL_BUFFERSIZE;
+        result = filter(stream, flush);
+        if ( Z_BUF_ERROR != result ) {
+            /* Ignore Z_BUF_ERROR since that just indicates that we
+             * need a larger buffer in order to proceed.  Thanks to
+             * Tobias Markmann for finding this bug!
+             */
+            lz_assert(L, result, stream, __FILE__, __LINE__);
+        }
+        luaL_addsize(&buff, LUAL_BUFFERSIZE - stream->avail_out);
+    } while ( stream->avail_out == 0 );
+
+    /*  Need to do this before we alter the stack: */
+    luaL_pushresult(&buff);
+
+    /*  "close" the stream/remove finalizer: */
+    if ( result == Z_STREAM_END || Z_BUF_ERROR == result ) {
+        /*  Close the stream: */
+        lz_assert(L, end(stream), stream, __FILE__, __LINE__);
+        lua_pushboolean(L, 1);
+    } else {
+        lua_pushboolean(L, 0);
+    }
+    lua_pushinteger(L, stream->total_in);
+    lua_pushinteger(L, stream->total_out);
+    lua_pushinteger(L, result);
+    lua_pushstring(L, stream->msg);
+    return 6;
+}
+
+
+
+static int lz_compress(lua_State *L) {
+    lua_Integer level = lua_type(L, 1)==LUA_TNUMBER ? lua_tointeger(L, 1) : Z_DEFAULT_COMPRESSION;
+    z_stream* stream = malloc(sizeof(z_stream));
+    stream->zalloc = Z_NULL;
+    stream->zfree  = Z_NULL;
+    lz_assert(L, deflateInit(stream, level), stream, __FILE__, __LINE__);
+    //lz_assert(L, deflateInit2(stream, level,8,(int)window_size,8,Z_DEFAULT_STRATEGY), stream, __FILE__, __LINE__);
+    return lz_filter_impl2(L,stream, deflate, deflateEnd, "deflate");
+}
+
+static int lz_uncompress(lua_State *L) {
+    lua_Integer window_size = lua_type(L, 1)==LUA_TNUMBER ? lua_tointeger(L, 1) : MAX_WBITS + 32;
+
+    z_stream* stream = malloc(sizeof(z_stream));
+    stream->zalloc   = Z_NULL;
+    stream->zfree    = Z_NULL;
+    stream->next_in  = Z_NULL;
+    stream->avail_in = 0;
+
+    lz_assert(L, inflateInit2(stream, (int)window_size), stream, __FILE__, __LINE__);
+    return lz_filter_impl2(L,stream, inflate, inflateEnd, "inflate");
+}
+
 static const luaL_Reg zlib_functions[] = {
+        { "compress", lz_compress },
+        { "uncompress", lz_uncompress },
     { "deflate", lz_deflate_new },
     { "inflate", lz_inflate_new },
     { "adler32", lz_adler32     },

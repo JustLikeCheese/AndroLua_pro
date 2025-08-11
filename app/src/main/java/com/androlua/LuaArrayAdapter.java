@@ -2,6 +2,7 @@ package com.androlua;
 
 import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
@@ -122,6 +123,21 @@ public class LuaArrayAdapter extends ArrayListAdapter {
                         w = mContext.getWidth();
                         img.setLayoutParams(new ViewGroup.LayoutParams(w, h));
                     }
+                } else if (drawable instanceof LoadingDrawable) {
+                        int w=mContext.getWidth();
+                        int h = w/4;
+                        w = mContext.getWidth();
+                        img.setLayoutParams(new ViewGroup.LayoutParams(w, h));
+                }else if (drawable instanceof Drawable) {
+                    Rect rect = drawable.getBounds();
+                    int w = rect.width();
+                    int h = rect.height();
+
+                    if (img.getScaleType() == ImageView.ScaleType.FIT_XY) {
+                        h = (int) (mContext.getWidth() * ((float) h) / ((float) w));
+                        w = mContext.getWidth();
+                        img.setLayoutParams(new ViewGroup.LayoutParams(w, h));
+                    }
                 }
             } catch (Exception e) {
                 Log.i("lua", e.getMessage());
@@ -167,8 +183,9 @@ public class LuaArrayAdapter extends ArrayListAdapter {
             try {
                 LuaBitmap.getBitmap(mContext, mPath);
                 mHandler.sendEmptyMessage(0);
-            } catch (IOException e) {
-                mContext.sendError("AsyncLoader", e);
+            } catch (Exception e) {
+                e.printStackTrace();
+                mContext.sendError("AsyncLoader Error", e);
             }
 
         }

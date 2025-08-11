@@ -6,7 +6,7 @@ return {
 "android.content.FileProvider$PathStrategy",
 "android.content.FileProvider$SimplePathStrategy",
 "android.content.FileProvider",
-"android.support.annotation.Keep",
+"androidx.annotation.Keep",
 "android.widget.ArrayExpandableListAdapter",
 "android.widget.ArrayListAdapter$ArrayFilter",
 "android.widget.ArrayListAdapter",

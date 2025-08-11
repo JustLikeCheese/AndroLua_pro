@@ -33,6 +33,7 @@
 ** Upvalues for Lua closures
 */
 struct UpVal {
+  lu_byte tt;
   TValue *v;  /* points to stack or to its own value */
   lu_mem refcount;  /* reference counter */
   union {
@@ -43,6 +44,9 @@ struct UpVal {
     TValue value;  /* the value (when closed) */
   } u;
 };
+/* variant for "To Be Closed" upvalues */
+#define LUA_TUPVAL	LUA_NUMTAGS  /* upvalues */
+#define LUA_TUPVALTBC	(LUA_TUPVAL | (1 << 4))
 
 #define upisopen(up)	((up)->v != &(up)->u.value)
 

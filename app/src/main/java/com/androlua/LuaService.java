@@ -466,7 +466,12 @@ public class LuaService extends Service implements LuaContext,LuaBroadcastReceiv
 		return LuaApplication.getInstance().getGlobalData();
 	}
 
-	@Override
+    @Override
+    public Object getSharedData() {
+        return LuaApplication.getInstance().getSharedData();
+    }
+
+    @Override
 	public Object getSharedData(String key) {
 		return LuaApplication.getInstance().getSharedData(key);
 	}

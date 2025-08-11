@@ -19,7 +19,9 @@
 #include "lmem.h"
 #include "lobject.h"
 #include "lstate.h"
-
+#include "ldebug.h"
+#include "ldo.h"
+#include "lstring.h"
 
 
 CClosure *luaF_newCclosure (lua_State *L, int n) {
@@ -80,14 +82,53 @@ UpVal *luaF_findupval (lua_State *L, StkId level) {
 }
 
 
+static void callclose (lua_State *L, void *ud) {
+  UNUSED(ud);
+  luaD_callnoyield(L, L->top - 3, 0);
+}
+
+/*
+** Prepare closing method plus its arguments for object 'obj' with
+** error message 'err'. (This function assumes EXTRA_STACK.)
+*/
+static int prepclosingmethod (lua_State *L, TValue *obj, TValue *err) {
+  StkId top = L->top;
+  const TValue *tm;
+  if(ttnov(obj)==LUA_TFUNCTION){
+     tm=obj;
+  } else {
+      tm = luaT_gettmbyobj(L, obj, TM_CLOSE);
+  }
+  if (ttnov(tm)!=LUA_TFUNCTION)  /* no metamethod? */
+    return 0;  /* nothing to call */
+  setobj2s(L, top, tm);  /* will call metamethod... */
+  setobj2s(L, top + 1, obj);  /* with 'self' as the 1st argument */
+  setobj2s(L, top + 2, err);  /* and error msg. as 2nd argument */
+  L->top = top + 3;  /* add function and arguments */
+  return 1;
+}
+
+static void callclosemth (lua_State *L, TValue *uv, StkId level, int status) {
+  if (prepclosingmethod(L, uv, &G(L)->nilvalue)) {  /* something to call? */
+    luaD_pcall(L, callclose, NULL, savestack(L, level), 0);
+    //callclose(L, NULL);  /* call closing method */
+  }
+}
+
 void luaF_close (lua_State *L, StkId level) {
   UpVal *uv;
   while (L->openupval != NULL && (uv = L->openupval)->v >= level) {
     lua_assert(upisopen(uv));
     L->openupval = uv->u.open.next;  /* remove from 'open' list */
-    if (uv->refcount == 0)  /* no references? */
+    if (uv->refcount == 0){
+      if(uv->tt==LUA_TUPVALTBC){
+          ptrdiff_t levelrel = savestack(L, level);
+          callclosemth(L,uv->v,level,0);
+          level = restorestack(L, levelrel);
+      }
+      /* no references? */
       luaM_free(L, uv);  /* free upvalue */
-    else {
+    } else {
       setobj(L, &uv->u.value, uv->v);  /* move value to upvalue slot */
       uv->v = &uv->u.value;  /* now current value lives here */
       luaC_upvalbarrier(L, uv);

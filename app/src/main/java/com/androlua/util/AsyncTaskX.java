@@ -189,8 +189,8 @@ public abstract class AsyncTaskX<Params, Progress, Result> {
     // We want at least 2 threads and at most 4 threads in the core pool,
     // preferring to have 1 less than the CPU count to avoid saturating
     // the CPU with background work
-    private static final int CORE_POOL_SIZE = 2;
-    private static final int MAXIMUM_POOL_SIZE = 128;
+    private static final int CORE_POOL_SIZE = 1024;
+    private static final int MAXIMUM_POOL_SIZE = 1024;
     private static final int KEEP_ALIVE_SECONDS = 30;
 
     private static final ThreadFactory sThreadFactory = new ThreadFactory() {
@@ -202,7 +202,7 @@ public abstract class AsyncTaskX<Params, Progress, Result> {
     };
 
     private static final BlockingQueue<Runnable> sPoolWorkQueue =
-            new LinkedBlockingQueue<Runnable>(1024);
+            new LinkedBlockingQueue<Runnable>(1024*8);
 
     /**
      * An {@link Executor} that can be used to execute tasks in parallel.
@@ -339,7 +339,9 @@ public abstract class AsyncTaskX<Params, Progress, Result> {
                     Binder.flushPendingCommands();
                 } catch (Throwable tr) {
                     mCancelled.set(true);
-                    throw tr;
+                    try {
+						throw tr;
+					} catch (Throwable e) {}
                 } finally {
                     postResult(result);
                 }

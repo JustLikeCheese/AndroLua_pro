@@ -40,7 +40,8 @@ typedef enum {
   TM_LE,
   TM_CONCAT,
   TM_CALL,
-  TM_N		/* number of elements in the enum */
+    TM_CLOSE,
+    TM_N		/* number of elements in the enum */
 } TMS;
 
 

@@ -981,6 +981,11 @@ static void f_call (lua_State *L, void *ud) {
   luaD_callnoyield(L, c->func, c->nresults);
 }
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#define LOG_TAG "lua"
+#define LOGD(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#endif
 
 
 LUA_API int lua_pcallk (lua_State *L, int nargs, int nresults, int errfunc,

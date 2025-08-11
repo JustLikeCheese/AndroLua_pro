@@ -1,5 +1,6 @@
 package com.androlua;
 
+import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
@@ -17,11 +18,17 @@ import java.util.Set;
  * Created by nirenr on 2018/08/05 0005.
  */
 
+@SuppressLint("ValidFragment")
 public class LuaPreferenceFragment extends PreferenceFragment implements Preference.OnPreferenceChangeListener, Preference.OnPreferenceClickListener {
 
     private LuaTable<Integer, LuaTable> mPreferences;
     private Preference.OnPreferenceChangeListener mOnPreferenceChangeListener;
     private Preference.OnPreferenceClickListener mOnPreferenceClickListener;
+
+    public LuaPreferenceFragment(LuaTable preferences){
+        super();
+        mPreferences=preferences;
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {

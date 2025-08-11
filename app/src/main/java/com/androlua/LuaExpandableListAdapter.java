@@ -515,7 +515,7 @@ public class LuaExpandableListAdapter extends BaseExpandableListAdapter {
 				mHandler.sendEmptyMessage(0);
 			}
 			catch (IOException e) {
-				mContext.sendError("AsyncLoader",e);
+				mContext.sendError("AsyncLoader Error",e);
 			}
 
 		}

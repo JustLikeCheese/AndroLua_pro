@@ -17,10 +17,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Message;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
 import android.webkit.ClientCertRequest;
+import android.webkit.CookieManager;
+import android.webkit.CookieSyncManager;
 import android.webkit.DownloadListener;
 import android.webkit.HttpAuthHandler;
 import android.webkit.JavascriptInterface;
@@ -63,6 +66,7 @@ public class LuaWebView extends WebView implements LuaGcable {
     private String mDir = "/";
     private LuaFunction<Boolean> mAdsFilter;
     private boolean mGc;
+    private String mHtml;
 
     @SuppressLint({"AddJavascriptInterface", "SetJavaScriptEnabled"})
     public LuaWebView(LuaActivity context) {
@@ -87,12 +91,13 @@ public class LuaWebView extends WebView implements LuaGcable {
         //getSettings().setDefaultZoom(WebSettings.ZoomDensity.FAR);
         addJavascriptInterface(new LuaJavaScriptInterface(context), "androlua");
         //requestFocus();
+        addJavascriptInterface(new InJavaScriptLocalObj(), "java_obj");
         setWebViewClient(new WebViewClient() {
                              public boolean shouldOverrideUrlLoading(WebView view, String url) {
                                  if (mAdsFilter != null) {
                                      try {
                                          Boolean ret = mAdsFilter.call(url);
-                                         if (ret!=null&&ret)
+                                         if (ret != null && ret)
                                              return true;
                                      } catch (LuaException e) {
                                          e.printStackTrace();
@@ -103,12 +108,12 @@ public class LuaWebView extends WebView implements LuaGcable {
                                      view.loadUrl(url);
                                      return true;
                                  } else {
-                                     try{
+                                     try {
                                          mContext.startActivityForResult(new Intent(Intent.ACTION_VIEW, Uri.parse(url)), 0);
-                                     }catch (Exception e){
-                                         mContext.sendError("LuaWebView",e);
+                                     } catch (Exception e) {
+                                         mContext.sendError("LuaWebView", e);
                                      }
-                                    return true;
+                                     return true;
                                  }
                              }
 
@@ -117,7 +122,7 @@ public class LuaWebView extends WebView implements LuaGcable {
                                  if (mAdsFilter != null) {
                                      try {
                                          Boolean ret = mAdsFilter.call(url);
-                                         if (ret!=null&&ret)
+                                         if (ret != null && ret)
                                              return new WebResourceResponse(null, null, null);
                                      } catch (LuaException e) {
                                          e.printStackTrace();
@@ -151,6 +156,13 @@ public class LuaWebView extends WebView implements LuaGcable {
                                  b.create();
                                  b.show();
                              }
+
+                             @Override
+                             public void onPageFinished(WebView view, String url) {
+                                 super.onPageFinished(view, url);
+                                 view.loadUrl("javascript:window.java_obj.get('<html>'+"
+                                         + "document.getElementsByTagName('html')[0].innerHTML+'</html>');");
+                             }
                          }
         );
 
@@ -163,14 +175,65 @@ public class LuaWebView extends WebView implements LuaGcable {
 
         setWebChromeClient(new LuaWebChromeClient());
         setDownloadListener(new Download());
+    }
 
+    final class InJavaScriptLocalObj {
+        @JavascriptInterface
+        public void get(String html) {
+            Log.i("luaj", "get: " + html);
+            mHtml = html;
+        }
+    }
 
+    public String getSource() {
+        return mHtml;
+    }
+
+    public void setCookie(String url, String cookie) {
+        CookieSyncManager.createInstance(mContext);
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        String[] cs = cookie.split(";");
+        for (String c : cs) {
+            cookieManager.setCookie(url, c);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            cookieManager.flush();
+        }
+        CookieSyncManager.getInstance().sync();
+    }
+
+    public void setCookie(String cookie) {
+        String url=getUrl();
+        CookieSyncManager.createInstance(mContext);
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        String[] cs = cookie.split(";");
+        for (String c : cs) {
+            cookieManager.setCookie(url, c);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            cookieManager.flush();
+        }
+        CookieSyncManager.getInstance().sync();
+    }
+
+    public String getCookie(String url) {
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        return cookieManager.getCookie(url);
+    }
+
+    public String getCookie() {
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        return cookieManager.getCookie(getUrl());
     }
 
     @Override
     public void gc() {
         destroy();
-        mGc=true;
+        mGc = true;
     }
 
     @Override
@@ -451,7 +514,7 @@ public class LuaWebView extends WebView implements LuaGcable {
 
     }
 
-    private final static String DOWNLOAD="Download";
+    private final static String DOWNLOAD = "Download";
 
     private class DownloadBroadcastReceiver extends BroadcastReceiver {
 
@@ -463,14 +526,14 @@ public class LuaWebView extends WebView implements LuaGcable {
             long id = p2.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, 0);
             Bundle bundle = p2.getExtras();
             //bundle.g
-            if (mDownload.containsKey(id) ) {
-                if(mOnDownloadCompleteListener != null){
+            if (mDownload.containsKey(id)) {
+                if (mOnDownloadCompleteListener != null) {
                     String[] data = mDownload.get(id);
                     mOnDownloadCompleteListener.onDownloadComplete(data[0], data[1]);
-                }else{
+                } else {
 
                 }
-             }
+            }
         }
     }
 
@@ -508,11 +571,11 @@ public class LuaWebView extends WebView implements LuaGcable {
             file_input_field = new EditText(mContext);
             //file_input_field.setTextColor(0xff000000);
             file_input_field.setText(mFilename);
-            String size=String.valueOf(contentLength)+"B";
-            if(contentLength>1024*1024)
-                size=String.format("%.2f MB",Long.valueOf(contentLength).doubleValue()/(1024*1024));
-            else if(contentLength>1024)
-                size=String.format("%.2f KB",Long.valueOf(contentLength).doubleValue()/(1024));
+            String size = String.valueOf(contentLength) + "B";
+            if (contentLength > 1024 * 1024)
+                size = String.format("%.2f MB", Long.valueOf(contentLength).doubleValue() / (1024 * 1024));
+            else if (contentLength > 1024)
+                size = String.format("%.2f KB", Long.valueOf(contentLength).doubleValue() / (1024));
 
             new AlertDialog.Builder(mContext)
                     .setTitle(DOWNLOAD)
@@ -554,7 +617,7 @@ public class LuaWebView extends WebView implements LuaGcable {
             uri.getLastPathSegment();
             DownloadManager.Request request = new DownloadManager.Request(uri);
             String dir = mContext.getLuaExtDir(DOWNLOAD);
-            request.setDestinationInExternalPublicDir(new File(mContext.getLuaExtDir()).getName()+"/"+DOWNLOAD, mFilename);
+            request.setDestinationInExternalPublicDir(new File(mContext.getLuaExtDir()).getName() + "/" + DOWNLOAD, mFilename);
 
             request.setTitle(mFilename);
 
@@ -566,7 +629,7 @@ public class LuaWebView extends WebView implements LuaGcable {
 
             //request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN);
             File f = new File(dir, mFilename);
-            if(f.exists())
+            if (f.exists())
                 f.delete();
 
             request.setMimeType(mMimetype);
@@ -826,7 +889,7 @@ public class LuaWebView extends WebView implements LuaGcable {
         public void onReceivedTitle(WebView view, String title) {
             //mContext.setTitle(title);
             super.onReceivedTitle(view, title);
-            if(mOnReceivedTitleListener!=null)
+            if (mOnReceivedTitleListener != null)
                 mOnReceivedTitleListener.onReceivedTitle(title);
         }
 
@@ -835,7 +898,7 @@ public class LuaWebView extends WebView implements LuaGcable {
             // TODO: Implement this method
             //mContext.setIcon(new BitmapDrawable(icon));
             super.onReceivedIcon(view, icon);
-            if(mOnReceivedIconListener!=null)
+            if (mOnReceivedIconListener != null)
                 mOnReceivedIconListener.onReceivedIcon(icon);
         }
 
@@ -866,19 +929,19 @@ public class LuaWebView extends WebView implements LuaGcable {
     private OnReceivedTitleListener mOnReceivedTitleListener;
     private OnReceivedIconListener mOnReceivedIconListener;
 
-    public void setOnReceivedTitleListener(OnReceivedTitleListener listener){
+    public void setOnReceivedTitleListener(OnReceivedTitleListener listener) {
         mOnReceivedTitleListener = listener;
     }
 
-    public void setOnReceivedIconListener(OnReceivedIconListener listener){
+    public void setOnReceivedIconListener(OnReceivedIconListener listener) {
         mOnReceivedIconListener = listener;
     }
 
-    public interface OnReceivedTitleListener{
+    public interface OnReceivedTitleListener {
         public void onReceivedTitle(String string);
     }
 
-    public interface OnReceivedIconListener{
+    public interface OnReceivedIconListener {
         public void onReceivedIcon(Bitmap bitmap);
     }
 }

@@ -61,7 +61,7 @@ public class PullingLayout extends RelativeLayout {
     // 下拉的距离。注意：pullDownY和pullUpY不可能同时不为0
     public float pullDownY = 0;
     // 回滚速度
-    public float MOVE_SPEED = 8;
+    public float MOVE_SPEED = 10;
     // 当前状态
     private int state = INIT;
     // 刷新回调接口
@@ -786,7 +786,7 @@ public class PullingLayout extends RelativeLayout {
      */
     public void autoRefresh() {
         AutoRefreshAndLoadTask task = new AutoRefreshAndLoadTask();
-        task.execute(20);
+        task.execute(8);
     }
 
     /**
@@ -893,7 +893,7 @@ public class PullingLayout extends RelativeLayout {
      */
     private class AutoRefreshAndLoadTask extends
             AsyncTask<Integer, Float, String> {
-
+        private int MOVE_SPEED=16;
         @Override
         protected String doInBackground(Integer... params) {
             while (pullDownY < 4 / 3 * refreshDist) {

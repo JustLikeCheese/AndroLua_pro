@@ -424,7 +424,7 @@ public class LuaAdapter extends BaseAdapter implements Filterable {
                 LuaBitmap.getBitmap(mContext, mPath);
                 mHandler.sendEmptyMessage(0);
             } catch (IOException e) {
-                mContext.sendError("AsyncLoader", e);
+                mContext.sendError("AsyncLoader Error", e);
             }
 
         }

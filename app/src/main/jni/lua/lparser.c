@@ -676,23 +676,56 @@ struct ConsControl {
   int tostore;  /* number of array elements pending to be stored */
 };
 
+static void body (LexState *ls, expdesc *e, int ismethod, int line);
 
+static TString * str_check(LexState *ls) {
+  TString * ts;
+  check(ls,TK_STRING);
+  ts = ls->t.seminfo.ts;
+  luaX_next(ls);
+  return ts;
+}
+static void checkstring(LexState *ls, expdesc *e) {
+  TString * str = str_check(ls);
+  codestring(ls, e, str);
+}
 static void recfield (LexState *ls, struct ConsControl *cc) {
   /* recfield -> (NAME | '['exp1']') = exp1 */
   FuncState *fs = ls->fs;
   int reg = ls->fs->freereg;
   expdesc key, val;
   int rkkey;
-  if (ls->t.token == TK_NAME) {
+  int isstr = 0;
+  int isfunc = 0;
+  if (ls->t.token == TK_FUNCTION) {
+    isfunc = 1;
+    checklimit(fs, cc->nh, MAX_INT, "items in a constructor");
+    luaX_next(ls);
+    checkname(ls,&key);
+  } else if (ls->t.token == TK_STRING) {
+    isstr = 1;
+    checklimit(fs,cc->nh, MAX_INT, "items in a constructor");
+    checkstring(ls,&key);
+  } else if (ls->t.token == TK_INT) {
+    isstr = 1;
+    checklimit(fs,cc->nh, MAX_INT, "items in a constructor");
+    init_exp(&key, VKINT, 0);
+    key.u.nval = ls->t.seminfo.r;
+    luaX_next(ls);
+  } else if (ls->t.token == TK_NAME) {
     checklimit(fs, cc->nh, MAX_INT, "items in a constructor");
     checkname(ls, &key);
   }
   else  /* ls->t.token == '[' */
     yindex(ls, &key);
   cc->nh++;
-  checknext(ls, '=');
+  if (!isfunc && (!isstr || !testnext(ls,':')))
+    checknext(ls, '=');
   rkkey = luaK_exp2RK(fs, &key);
-  expr(ls, &val);
+  if (isfunc)
+    body(ls,&val, 0, ls->linenumber);
+  else
+    expr(ls, &val);
   luaK_codeABC(fs, OP_SETTABLE, cc->t->u.info, rkkey, luaK_exp2RK(fs, &val));
   fs->freereg = reg;  /* free registers */
 }
@@ -736,6 +769,29 @@ static void listfield (LexState *ls, struct ConsControl *cc) {
 static void field (LexState *ls, struct ConsControl *cc) {
   /* field -> listfield | recfield */
   switch(ls->t.token) {
+    case TK_STRING: {
+      int token = luaX_lookahead(ls);
+      if (token != '=' && token != ':') /* expression? */
+        listfield(ls,cc);
+      else
+        recfield(ls,cc);
+      break;
+    }
+    case TK_FUNCTION: {
+      int token = luaX_lookahead(ls);
+      if (token != TK_NAME) /* expression? */
+        listfield(ls,cc);
+      else
+        recfield(ls,cc);
+      break;
+    }
+    case TK_INT:{  /* may be 'listfield' or 'recfield' */
+      if (luaX_lookahead(ls) != '=')  /* expression? */
+        listfield(ls, cc);
+      else
+        recfield(ls, cc);
+      break;
+    }
     case TK_NAME: {  /* may be 'listfield' or 'recfield' */
       if (luaX_lookahead(ls) != '=')  /* expression? */
         listfield(ls, cc);
@@ -1436,6 +1492,28 @@ static int exp1 (LexState *ls) {
   return reg;
 }
 
+static void foreachbody (LexState *ls, int base, int line, int nvars) {
+  /* forbody -> DO block */
+    /* forbody -> DO block */
+    BlockCnt bl;
+    FuncState *fs = ls->fs;
+    int prep, endfor;
+    adjustlocalvars(ls, 3);  /* control variables */
+    ichecknext(ls, TK_DO);//mod by nirenr
+    prep = luaK_codeAsBx(fs, OP_TFOREACH, base, NO_JUMP);
+    enterblock(fs, &bl, 0);  /* scope for declared variables */
+    adjustlocalvars(ls, nvars);
+    luaK_reserveregs(fs, nvars);
+    block(ls);
+    continuelabel(ls);//mod by nirenr
+    leaveblock(fs);  /* end of scope for declared variables */
+    luaK_patchtohere(fs, prep);
+    luaK_codeABC(fs, OP_TFORCALL, base, 0, nvars);
+    luaK_fixline(fs, line);
+    endfor = luaK_codeAsBx(fs, OP_TFORLOOP, base + 2, NO_JUMP);
+    luaK_patchlist(fs, endfor, prep + 1);
+    luaK_fixline(fs, line);
+}
 
 static void forbody (LexState *ls, int base, int line, int nvars, int isnum) {
   /* forbody -> DO block */
@@ -1503,11 +1581,15 @@ static void forlist (LexState *ls, TString *indexname) {
     new_localvar(ls, str_checkname(ls));
     nvars++;
   }
+  //int foreach = testnext(ls,':');
   ichecknext(ls, TK_IN);//mod by nirenr
   line = ls->linenumber;
   adjust_assign(ls, 3, explist(ls, &e), &e);
   luaK_checkstack(fs, 3);  /* extra space to call generator */
-  forbody(ls, base, line, nvars - 3, 0);
+  /*if(foreach)
+    foreachbody(ls, base, line, nvars);
+  else*/
+    forbody(ls, base, line, nvars - 3, 0);
 }
 
 
@@ -1644,7 +1726,7 @@ static void whenstat (LexState *ls, int line) {
       single_block(ls);  /* 'else' part */
     luaK_patchtohere(fs, escapelist);  /* patch escape list to 'if' end */
 }
-
+//http://127.0.0.1:8080/h 图片传base64
 //================================================ SWITCH ========================================================
 static expdesc clone(expdesc e2){
   expdesc e1;
@@ -1748,10 +1830,22 @@ static void localfunc (LexState *ls) {
   getlocvar(fs, b.u.info)->startpc = fs->pc;
 }
 
+static void closefunc (LexState *ls,FuncState *fs) {
+  new_localvar(ls, luaS_newliteral(ls->L, "(defer)"));
+  exp1(ls);
+  markupval(fs, fs->nactvar);
+  adjustlocalvars(ls, 1);
+  luaK_codeABC(fs, OP_TBC, fs->nactvar - 1, 0, 0);
+}
+
 static void commonlocalstat (LexState *ls) {
   /* stat -> LOCAL NAME {',' NAME} ['=' explist] */
   int nvars = 0;
   int nexps;
+  if(testnext(ls,'<')){
+    str_checkname(ls);
+    checknext(ls,'>');
+  }
   expdesc e;
   do {
     new_localvar(ls, str_checkname(ls));
@@ -1768,10 +1862,60 @@ static void commonlocalstat (LexState *ls) {
 }
 
 
+static void tocloselocalstat (LexState *ls) {
+  FuncState *fs = ls->fs;
+  /*TString *attr = str_checkname(ls);
+  if (strcmp(getstr(attr), "toclose") != 0)
+    luaK_semerror(ls,
+      luaO_pushfstring(ls->L, "unknown attribute '%s'", getstr(attr)));*/
+  if (itestnext(ls, TK_FUNCTION)){
+    closefunc(ls,fs);
+    return;
+  }
+  new_localvar(ls, str_checkname(ls));
+  checknext(ls, '=');
+  exp1(ls);
+  markupval(fs, fs->nactvar);
+  adjustlocalvars(ls, 1);
+  luaK_codeABC(fs, OP_TBC, fs->nactvar - 1, 0, 0);
+}
+
+
 static void localstat (LexState *ls) {
   /* stat -> LOCAL NAME {',' NAME} ['=' explist]
            | LOCAL *toclose NAME '=' exp */
+  if (testnext(ls, '*'))
+    tocloselocalstat(ls);
+  else
     commonlocalstat(ls);
+}
+
+static void deferbody (LexState *ls, expdesc *e, int line) {
+  FuncState new_fs;
+  BlockCnt bl;
+  new_fs.f = addprototype(ls);
+  new_fs.f->linedefined = line;
+  open_func(ls, &new_fs, &bl);
+/*  if (testnext(ls, '(')) {
+    parlist(ls);
+    checknext(ls, ')');
+  }*/
+  statement(ls);
+  new_fs.f->lastlinedefined = ls->linenumber;
+  codeclosure(ls, e);
+  close_func(ls);
+}
+
+static void deferstat (LexState *ls) {
+  expdesc b;
+  FuncState *fs = ls->fs;
+  new_localvar(ls, luaS_newliteral(ls->L, "(defer)"));  /* new local variable */
+  deferbody(ls, &b, ls->linenumber);  /* function created in next register */
+  markupval(fs, fs->nactvar);
+  adjustlocalvars(ls, 1);  /* enter its scope */
+  luaK_codeABC(fs, OP_TBC, fs->nactvar - 1, 0, 0);
+  /* debug information will only see the variable after this point! */
+  getlocvar(fs, b.u.info)->startpc = fs->pc;
 }
 
 
@@ -1903,6 +2047,10 @@ static void statement (LexState *ls) {
         localstat(ls);
       break;
     }
+    case TK_DEFER:
+      luaX_next(ls);  /* skip DEFER */
+      deferstat(ls);
+      break;
     case TK_DBCOLON: {  /* stat -> label */
       luaX_next(ls);  /* skip double colon */
       labelstat(ls, str_checkname(ls), line);
@@ -1916,6 +2064,7 @@ static void statement (LexState *ls) {
     case TK_CONTINUE://mod by nirenr
     case TK_BREAK: {  /* stat -> breakstat */
       gotostat(ls, luaK_jump(ls->fs));
+      while (testnext(ls, ';')) {}  /* skip semicolons */
       if (!block_follow(ls, 1))
         luaX_syntaxerror(ls, "unreachable statement");
       break;
@@ -1955,11 +2104,16 @@ static void mainfunc (LexState *ls, FuncState *fs) {
   adjust_assign(ls, 1, 1, &env);
   adjustlocalvars(ls, 1);
   luaX_next(ls);  /* read first token */
-  statlist(ls);  /* parse main body */
+  if(ls->t.token==TK_STRING||ls->t.token=='{')
+    retstat(ls);
+  else
+    statlist(ls);  /* parse main body */
   check(ls, TK_EOS);
   close_func(ls);
 }
+//image
 
+//image=base64(image[byte])好了
 
 LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
                        Dyndata *dyd, const char *name, int firstchar) {

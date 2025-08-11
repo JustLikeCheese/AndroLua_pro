@@ -158,7 +158,7 @@ public class LuaAsyncTask extends AsyncTaskX implements LuaGcable {
 					_import.call(s.toString());
 			}
 			catch (LuaException e) {
-				
+			//	e.printStackTrace();
 			}
 		}
 
@@ -186,7 +186,7 @@ public class LuaAsyncTask extends AsyncTaskX implements LuaGcable {
 			}
 			throw new LuaException(errorReason(ok) + ": " + L.toString(-1));
 		} 
-		catch (LuaException e) {
+		catch (Exception e) {
 			mLuaContext.sendError("doInBackground", e);
 		}
 

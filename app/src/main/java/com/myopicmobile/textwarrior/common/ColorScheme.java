@@ -18,10 +18,10 @@ public abstract class ColorScheme
 		FOREGROUND, BACKGROUND, SELECTION_FOREGROUND, SELECTION_BACKGROUND,
 		CARET_FOREGROUND, CARET_BACKGROUND, CARET_DISABLED, LINE_HIGHLIGHT,
 		NON_PRINTING_GLYPH, COMMENT, KEYWORD, NAME, LITERAL,STRING,
-		SECONDARY
+		GLOBAL, UPVAL, LOCAL, SECONDARY
 		}
 
-	protected HashMap<Colorable, Integer> _colors = generateDefaultColors();
+	private HashMap<Colorable, Integer> _colors = generateDefaultColors();
 
 	public void setColor(Colorable colorable, int color)
 	{
@@ -45,6 +45,15 @@ public abstract class ColorScheme
 		Colorable element;
 		switch (tokenType)
 		{
+			case Lexer.GLOBAL:
+				element = Colorable.GLOBAL;
+				break;
+			case Lexer.UPVAL:
+				element = Colorable.UPVAL;
+				break;
+			case Lexer.LOCAL:
+				element = Colorable.LOCAL;
+				break;
 			case Lexer.NORMAL:
 				element = Colorable.FOREGROUND;
 				break;
@@ -57,8 +66,10 @@ public abstract class ColorScheme
 			case Lexer.DOUBLE_SYMBOL_LINE: //fall-through
 			case Lexer.DOUBLE_SYMBOL_DELIMITED_MULTILINE:
 			case Lexer.SINGLE_SYMBOL_LINE_B:
+			case Lexer.COMMENT:
 				element = Colorable.COMMENT;
 				break;
+			case Lexer.STRING:
 			case Lexer.SINGLE_SYMBOL_DELIMITED_A: //fall-through
 			case Lexer.SINGLE_SYMBOL_DELIMITED_B:
 				element = Colorable.STRING;
@@ -88,6 +99,10 @@ public abstract class ColorScheme
 	{
 		// High-contrast, black-on-white color scheme
 		HashMap<Colorable, Integer> colors = new HashMap<Colorable, Integer>(Colorable.values().length);
+		colors.put(Colorable.GLOBAL, GREEN);
+		colors.put(Colorable.UPVAL, BLUE);
+		colors.put(Colorable.LOCAL, YELLOW);
+
 		colors.put(Colorable.FOREGROUND, BLACK);
 		colors.put(Colorable.BACKGROUND, WHITE);
 		colors.put(Colorable.SELECTION_FOREGROUND, WHITE);
@@ -109,8 +124,9 @@ public abstract class ColorScheme
 
 	// In ARGB format: 0xAARRGGBB
 	private static final int BLACK = 0xFF000000;
-	private static final int BLUE = 0xFF0000FF;
-	private static final int DARK_RED = 0xFF8B0000;
+	private static final int BLUE = 0xFF8888AA;
+	private static final int YELLOW = 0xFFAAAA88;
+	private static final int DARK_RED = 0xFFBBBBBB;
 	private static final int DARK_BLUE = 0xFFD040DD;
 	private static final int GREY = 0xFF808080;
 	private static final int LIGHT_GREY = 0xFFAAAAAA;
@@ -118,7 +134,7 @@ public abstract class ColorScheme
 	private static final int INDIGO = 0xFF2A40FF;
 	private static final int OLIVE_GREEN = 0xFF3F7F5F;
 	private static final int PURPLE = 0xFFDD4488;
-	private static final int RED = 0x44FF0000;
+	private static final int RED = 0xFFAA8888;
 	private static final int WHITE = 0xFFFFFFE0;
 	private static final int PURPLE2 = 0xFFFF00FF;
 	private static final int LIGHT_BLUE = 0xFF6080FF;

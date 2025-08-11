@@ -38,7 +38,7 @@
 
 /* ORDER RESERVED */
 static const char *const luaX_tokens [] = {
-    "and", "break", "case", "continue", "default", "do", "else", "elseif",
+    "and", "break", "case", "continue", "default", "defer", "do", "else", "elseif",
     "end", "false", "for", "function", "goto", "if",
     "in", "lambda", "local", "nil", "not", "or", "repeat",
     "return", "switch", "then", "true", "until", "when", "while",
@@ -524,6 +524,10 @@ static int llex (LexState *ls, SemInfo *seminfo) {
       case '@': {
         next(ls);
         return TK_DBCOLON;
+      }
+      case '$': {
+        next(ls);
+        return TK_LOCAL;
       }
       case '&': {
          next(ls);

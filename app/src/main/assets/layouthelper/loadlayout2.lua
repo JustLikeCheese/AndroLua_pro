@@ -553,6 +553,11 @@ local function loadlayout(t, root, group,p)
     pcall(setMiniSize, view)
 
     if view.getBackground() == nil then
+        local gd=GradientDrawable()
+        gd.setColor(0x00ffffff)
+        gd.setStroke(2,0x44000000,5,5)
+        gd.setGradientRadius(700)
+        gd.setGradientType(1)
         setBackground(view, gd)
     end
 

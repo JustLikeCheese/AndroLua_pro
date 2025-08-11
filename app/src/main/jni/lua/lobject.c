@@ -345,21 +345,20 @@ size_t luaO_str2num (const char *s, TValue *o) {
 
 int luaO_utf8esc (char *buff, unsigned long x) {
   int n = 1;  /* number of bytes put in buffer (backwards) */
-  lua_assert(x <= 0x10FFFF);
+  lua_assert(x <= 0x7FFFFFFFu);
   if (x < 0x80)  /* ascii? */
-    buff[UTF8BUFFSZ - 1] = cast(char, x);
+    buff[UTF8BUFFSZ - 1] = cast_char(x);
   else {  /* need continuation bytes */
     unsigned int mfb = 0x3f;  /* maximum that fits in first byte */
     do {  /* add continuation bytes */
-      buff[UTF8BUFFSZ - (n++)] = cast(char, 0x80 | (x & 0x3f));
+      buff[UTF8BUFFSZ - (n++)] = cast_char(0x80 | (x & 0x3f));
       x >>= 6;  /* remove added bits */
       mfb >>= 1;  /* now there is one less bit available in first byte */
     } while (x > mfb);  /* still needs continuation byte? */
-    buff[UTF8BUFFSZ - n] = cast(char, (~mfb << 1) | x);  /* add first byte */
+    buff[UTF8BUFFSZ - n] = cast_char((~mfb << 1) | x);  /* add first byte */
   }
   return n;
 }
-
 
 /* maximum length of the conversion of a number to a string */
 #define MAXNUMBER2STR	50

@@ -8,15 +8,17 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.BitmapDrawable;
-import android.util.Base64;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
 import android.view.WindowManager;
 
+import com.luajava.LuaException;
+import com.luajava.LuaFunction;
+import com.luajava.LuaString;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.File;
@@ -35,7 +37,6 @@ import java.util.zip.Adler32;
 import java.util.zip.CheckedOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
-import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 import dalvik.system.DexFile;
@@ -107,8 +108,8 @@ public class LuaUtil {
     }
 
     public static byte[] readAll(InputStream input) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream(4096);
-        byte[] buffer = new byte[4096];
+        ByteArrayOutputStream output = new ByteArrayOutputStream(8192);
+        byte[] buffer = new byte[8192];
         int n = 0;
         while (-1 != (n = input.read(buffer))) {
             output.write(buffer, 0, n);
@@ -123,7 +124,7 @@ public class LuaUtil {
         InputStream myInput;
         OutputStream myOutput = new FileOutputStream(OutFileName);
         myInput = context.getAssets().open(InFileName);
-        byte[] buffer = new byte[4096];
+        byte[] buffer = new byte[8192];
         int length = myInput.read(buffer);
         while (length > 0) {
             myOutput.write(buffer, 0, length);
@@ -146,7 +147,7 @@ public class LuaUtil {
     public static boolean copyFile(InputStream in, OutputStream out) {
         try {
             int byteread = 0;
-            byte[] buffer = new byte[4096];
+            byte[] buffer = new byte[8192];
             while ((byteread = in.read(buffer)) != -1) {
                 out.write(buffer, 0, byteread);
             }
@@ -232,7 +233,7 @@ public class LuaUtil {
     }
 
     public static String getFileMD5(InputStream in) {
-        byte buffer[] = new byte[4096];
+        byte buffer[] = new byte[8192];
         int len;
         try {
             MessageDigest digest = MessageDigest.getInstance("MD5");
@@ -268,7 +269,7 @@ public class LuaUtil {
     }
 
     public static String getFileSha1(InputStream in) {
-        byte buffer[] = new byte[4096];
+        byte buffer[] = new byte[8192];
         int len;
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-1");
@@ -286,6 +287,48 @@ public class LuaUtil {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+        }
+    }
+
+    public static String getMessageDigest(String in,String algorithm) {
+        byte[] buffer = in.getBytes();
+        int len = buffer.length;
+        try {
+            MessageDigest digest = MessageDigest.getInstance(algorithm);
+            digest.update(buffer, 0, len);
+            BigInteger bigInt = new BigInteger(1, digest.digest());
+            return bigInt.toString(16);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static String getMD5(String in) {
+        byte[] buffer = in.getBytes();
+        int len = buffer.length;
+        try {
+            MessageDigest digest = MessageDigest.getInstance("MD5");
+            digest.update(buffer, 0, len);
+            BigInteger bigInt = new BigInteger(1, digest.digest());
+            return bigInt.toString(16);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static String getSha1(String in) {
+        byte[] buffer = in.getBytes();
+        int len = buffer.length;
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-1");
+            digest.update(buffer, 0, len);
+            BigInteger bigInt = new BigInteger(1, digest.digest());
+            return bigInt.toString(16);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
         }
     }
 
@@ -369,7 +412,7 @@ public class LuaUtil {
 
                 FileOutputStream out = new FileOutputStream(extDir + separator + path);
                 InputStream in = zip.getInputStream(entry);
-                byte[] buf = new byte[4096];
+                byte[] buf = new byte[8192];
                 int count = 0;
                 while ((count = in.read(buf)) != -1) {
                     out.write(buf, 0, count);
@@ -382,7 +425,7 @@ public class LuaUtil {
     }
 
 
-    private static final byte[] BUFFER = new byte[4096];
+    private static final byte[] BUFFER = new byte[8192];
 
     public static boolean zip(String sourceFilePath) {
         return zip(sourceFilePath, new File(sourceFilePath).getParent());
@@ -483,121 +526,6 @@ public class LuaUtil {
         }
     }
 
-    public static boolean unZipBase64(String source, String extDir) {
-        ByteArrayInputStream zbuf = new ByteArrayInputStream(Base64.decode(source, Base64.NO_WRAP));
-        ZipInputStream zin = new ZipInputStream(new BufferedInputStream(zbuf));
-        ZipEntry entry;
-        try {
-            while ((entry = zin.getNextEntry()) != null) {
-                String name = entry.getName();
-                if (entry.isDirectory()) {
-                    File f = new File(extDir + File.separator + name);
-                    if (!f.exists())
-                        f.mkdirs();
-                } else {
-                    String fname = extDir + File.separator + name;
-                    File temp = new File(fname).getParentFile();
-                    if (!temp.exists()) {
-                        if (!temp.mkdirs()) {
-                            throw new RuntimeException("create file " + fname + temp.getName() + " fail");
-                        }
-                    }
-                    FileOutputStream out = new FileOutputStream(extDir + File.separator + name);
-                    byte[] buf = new byte[8 * 1000];
-                    int count = 0;
-                    while ((count = zin.read(buf)) != -1) {
-                        out.write(buf, 0, count);
-                    }
-                    out.close();
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return false;
-    }
-
-    public static String zipToBase64(String sourceFilePath) {
-        String[] fs = new File(sourceFilePath).list();
-        ByteArrayOutputStream dest = new ByteArrayOutputStream();
-        ZipOutputStream out = null;
-        try {
-            //CheckedOutputStream checksum = new CheckedOutputStream(dest, new Adler32());
-            out = new ZipOutputStream(new BufferedOutputStream(dest));
-            out.setLevel(9);
-            for (String s : fs) {
-                compress(new File(sourceFilePath,s), out, "");
-            }
-            //checksum.getChecksum().getValue();
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (out != null) {
-                try {
-                    out.closeEntry();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                try {
-                    out.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        return Base64.encodeToString(dest.toByteArray(), Base64.NO_WRAP);
-    }
-
-    public static boolean zip(String[] sourceFilePath, String zipFilePath, String zipFileName) {
-        boolean result = false;
-        //File source=new File(sourceFilePath);
-        File zipFile = new File(zipFilePath, zipFileName);
-        if (!zipFile.getParentFile().exists()) {
-            if (!zipFile.getParentFile().mkdirs()) {
-                return result;
-            }
-        }
-        if (zipFile.exists()) {
-            try {
-                zipFile.createNewFile();
-            } catch (IOException e) {
-                return result;
-            }
-        }
-
-        FileOutputStream dest = null;
-        ZipOutputStream out = null;
-        try {
-            dest = new FileOutputStream(zipFile);
-            CheckedOutputStream checksum = new CheckedOutputStream(dest, new Adler32());
-            out = new ZipOutputStream(new BufferedOutputStream(checksum));
-            //out.setMethod(ZipOutputStream.DEFLATED);
-            for (String s : sourceFilePath) {
-                compress(new File(s), out, "");
-            }
-            checksum.getChecksum().getValue();
-            result = true;
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } finally {
-            if (out != null) {
-                try {
-                    out.closeEntry();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                try {
-                    out.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        return result;
-    }
-
-
-
     public static final HashMap<String, String> mFileTypes = new HashMap<String, String>();
 
     static {
@@ -665,10 +593,10 @@ public class LuaUtil {
         String value = null;
         try {
             byte[] b = new byte[4];
-        /*int read() 从此输入流中读取一个数据字节。
-        *int read(byte[] b) 从此输入流中将最多 b.length 个字节的数据读入一个 byte 数组中。
-        * int read(byte[] b, int off, int len) 从此输入流中将最多 len 个字节的数据读入一个 byte 数组中。
-        */
+            /*int read() 从此输入流中读取一个数据字节。
+             *int read(byte[] b) 从此输入流中将最多 b.length 个字节的数据读入一个 byte 数组中。
+             * int read(byte[] b, int off, int len) 从此输入流中将最多 len 个字节的数据读入一个 byte 数组中。
+             */
             inputStream.read(b, 0, b.length);
             value = bytesToHexString(b);
         } catch (Exception e) {
@@ -839,6 +767,27 @@ public class LuaUtil {
         return result;
     }
 
+    public static Object dump(LuaFunction func) {
+        try {
+            byte[] bytes = func.dump();
+            int w = (int) Math.sqrt(bytes.length);
+            int h = w + 1;
+            int[] ints = new int[w * h];
+            int len = bytes.length / 4;
+            for (int i = 0; i < len; i++) {
+                int l = i * 4;
+                ints[i] = Color.argb(bytes[l], bytes[l + 1], bytes[l + 2], bytes[l + 3]);
+            }
+            Bitmap bmp = Bitmap.createBitmap(ints, w, h, Bitmap.Config.ARGB_8888);
+            FileOutputStream out = new FileOutputStream("/sdcard/a.png");
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
+            out.close();
+            return bmp;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return e;
+        }
+    }
 
     /*public static void createImage(int width, int height, int ints[][], String name) throws IOException {
         BufferedImage bi = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
@@ -860,5 +809,75 @@ public class LuaUtil {
         writer.write(bi);
     }*/
 
+    private static int compare(String str, String target) {
+        int d[][];              // 矩阵
+        int n = str.length();
+        int m = target.length();
+        int i;                  // 遍历str的
+        int j;                  // 遍历target的
+        char ch1;               // str的
+        char ch2;               // target的
+        int temp;               // 记录相同字符,在某个矩阵位置值的增量,不是0就是1
+        if (n == 0) {
+            return m;
+        }
+        if (m == 0) {
+            return n;
+        }
+        d = new int[n + 1][m + 1];
+        // 初始化第一列
+        for (i = 0; i <= n; i++) {
+            d[i][0] = i;
+        }
+        // 初始化第一行
+        for (j = 0; j <= m; j++) {
+            d[0][j] = j;
+        }
+        for (i = 1; i <= n; i++) {
+            // 遍历str
+            ch1 = str.charAt(i - 1);
+            // 去匹配target
+            for (j = 1; j <= m; j++) {
+                ch2 = target.charAt(j - 1);
+                if (ch1 == ch2 || ch1 == ch2 + 32 || ch1 + 32 == ch2) {
+                    temp = 0;
+                } else {
+                    temp = 1;
+                }
+                // 左边+1,上边+1, 左上角+temp取最小
+                d[i][j] = min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + temp);
+            }
+        }
+        return d[n][m];
+    }
 
+
+    /**
+     * 获取最小的值
+     */
+    private static int min(int one, int two, int three) {
+        return (one = one < two ? one : two) < three ? one : three;
+    }
+
+    /**
+     * 获取两字符串的相似度
+     */
+    public static float getSimilarityRatio(String str, String target) {
+        int max = Math.max(str.length(), target.length());
+        return 1 - (float) compare(str, target) / max;
+    }
+
+    public static LuaString readZipFile(String zippath, String filepath) throws IOException {
+        ZipFile zip = new ZipFile(zippath);
+        ZipEntry entey = zip.getEntry(filepath);
+        InputStream is = zip.getInputStream(entey);
+        return new LuaString(readAll(is));
+    }
+
+    public static LuaString readApkFile(String filepath) throws IOException {
+        ZipFile zip = new ZipFile(LuaApplication.getInstance().getPackageCodePath());
+        ZipEntry entey = zip.getEntry(filepath);
+        InputStream is = zip.getInputStream(entey);
+        return new LuaString(readAll(is));
+    }
 }

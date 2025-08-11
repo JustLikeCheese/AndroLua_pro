@@ -40,17 +40,16 @@ LOCAL_SRC_FILES := \
 	ltable.c \
 	ltablib.c \
 	ltm.c \
-	lua.c \
-	luac.c \
 	lundump.c \
 	lutf8lib.c \
 	lvm.c \
 	lzio.c 
+#	lua.c \
+#	luac.c \
 
 # Auxiliary lua user defined file
 # LOCAL_SRC_FILES += luauser.c
 # LOCAL_CFLAGS := -DLUA_DL_DLOPEN -DLUA_USER_H='"luauser.h"'
 
 LOCAL_CFLAGS := -DLUA_DL_DLOPEN
-LOCAL_LDLIBS += -L$(SYSROOT)/usr/lib -llog -ldl
-include $(BUILD_STATIC_LIBRARY) 
+include $(BUILD_STATIC_LIBRARY)

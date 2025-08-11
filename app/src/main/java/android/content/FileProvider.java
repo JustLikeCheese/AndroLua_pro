@@ -17,9 +17,6 @@ import android.net.Uri.Builder;
 import android.os.Environment;
 import android.os.ParcelFileDescriptor;
 import android.os.Build.VERSION;
-import android.support.annotation.GuardedBy;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.text.TextUtils;
 import android.webkit.MimeTypeMap;
 
@@ -45,7 +42,7 @@ public class FileProvider extends ContentProvider {
     private static final String ATTR_NAME = "name";
     private static final String ATTR_PATH = "path";
     private static final File DEVICE_ROOT = new File("/");
-    @GuardedBy("sCache")
+    
     private static HashMap<String, FileProvider.PathStrategy> sCache = new HashMap();
     private FileProvider.PathStrategy mStrategy;
 
@@ -56,7 +53,7 @@ public class FileProvider extends ContentProvider {
         return true;
     }
 
-    public void attachInfo(@NonNull Context context, @NonNull ProviderInfo info) {
+    public void attachInfo(Context context, ProviderInfo info) {
         super.attachInfo(context, info);
         if (info.exported) {
             throw new SecurityException("Provider must not be exported");
@@ -67,12 +64,12 @@ public class FileProvider extends ContentProvider {
         }
     }
 
-    public static Uri getUriForFile(@NonNull Context context, @NonNull String authority, @NonNull File file) {
+    public static Uri getUriForFile(Context context, String authority, File file) {
         FileProvider.PathStrategy strategy = getPathStrategy(context, authority);
         return strategy.getUriForFile(file);
     }
 
-    public Cursor query(@NonNull Uri uri, @Nullable String[] projection, @Nullable String selection, @Nullable String[] selectionArgs, @Nullable String sortOrder) {
+    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
         File file = this.mStrategy.getFileForUri(uri);
         if (projection == null) {
             projection = COLUMNS;
@@ -102,7 +99,7 @@ public class FileProvider extends ContentProvider {
         return cursor;
     }
 
-    public String getType(@NonNull Uri uri) {
+    public String getType(Uri uri) {
         File file = this.mStrategy.getFileForUri(uri);
         int lastDot = file.getName().lastIndexOf(46);
         if (lastDot >= 0) {
@@ -116,20 +113,20 @@ public class FileProvider extends ContentProvider {
         return "application/octet-stream";
     }
 
-    public Uri insert(@NonNull Uri uri, ContentValues values) {
+    public Uri insert(Uri uri, ContentValues values) {
         throw new UnsupportedOperationException("No external inserts");
     }
 
-    public int update(@NonNull Uri uri, ContentValues values, @Nullable String selection, @Nullable String[] selectionArgs) {
+    public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
         throw new UnsupportedOperationException("No external updates");
     }
 
-    public int delete(@NonNull Uri uri, @Nullable String selection, @Nullable String[] selectionArgs) {
+    public int delete(Uri uri, String selection, String[] selectionArgs) {
         File file = this.mStrategy.getFileForUri(uri);
         return file.delete() ? 1 : 0;
     }
 
-    public ParcelFileDescriptor openFile(@NonNull Uri uri, @NonNull String mode) throws FileNotFoundException {
+    public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
         File file = this.mStrategy.getFileForUri(uri);
         int fileMode = modeToMode(mode);
         return ParcelFileDescriptor.open(file, fileMode);
@@ -207,13 +204,13 @@ public class FileProvider extends ContentProvider {
         }
     }
 
-    @NonNull
-    public static File[] getExternalFilesDirs(@NonNull Context context, @Nullable String type) {
+    
+    public static File[] getExternalFilesDirs(Context context, String type) {
         return VERSION.SDK_INT >= 19 ? context.getExternalFilesDirs(type) : new File[]{context.getExternalFilesDir(type)};
     }
 
-    @NonNull
-    public static File[] getExternalCacheDirs(@NonNull Context context) {
+
+    public static File[] getExternalCacheDirs(Context context) {
         return VERSION.SDK_INT >= 19 ? context.getExternalCacheDirs() : new File[]{context.getExternalCacheDir()};
     }
 

@@ -29,6 +29,8 @@
 #include "ltable.h"
 #include "ltm.h"
 #include "lvm.h"
+#include "lapi.h"
+#include "lauxlib.h"
 
 
 /* limit for table tag-method chains (to avoid loops) */
@@ -786,7 +788,16 @@ void luaV_finishOp (lua_State *L) {
 #define LOG_TAG "lua"
 #define LOGD(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #endif
-
+static int luaB_next (lua_State *L) {
+  luaL_checktype(L, 1, LUA_TTABLE);
+  lua_settop(L, 2);  /* create a 2nd argument if there isn't one */
+  if (lua_next(L, 1))
+    return 2;
+  else {
+    lua_pushnil(L);
+    return 1;
+  }
+}
 
 void luaV_execute (lua_State *L) {
   CallInfo *ci = L->ci;
@@ -811,10 +822,6 @@ void luaV_execute (lua_State *L) {
       }
       vmcase(OP_LOADK) {
         TValue *rb = k + GETARG_Bx(i);
-        /*LOGD("type error %d %d",ttype(ra),ttype(rb));
-        if(ra->tt_!=LUA_TNIL&&rb->tt_!=LUA_TNIL&&ra->tt_<LUA_MULTRET&&rb->tt_<LUA_MULTRET&&rb->tt_!=ra->tt_){
-          luaG_runerror(L, "type error %d %d",ra->tt_,rb->tt_);
-        }*/
         setobj2s(L, ra, rb);
         vmbreak;
       }
@@ -822,11 +829,6 @@ void luaV_execute (lua_State *L) {
         TValue *rb;
         lua_assert(GET_OPCODE(*ci->u.l.savedpc) == OP_EXTRAARG);
         rb = k + GETARG_Ax(*ci->u.l.savedpc++);
-        /*if(ra->tt_!=LUA_TNIL&&rb->tt_!=LUA_TNIL&&rb->tt_!=ra->tt_){
-          luaO_tostring(L, ra);
-          luaO_tostring(L, rb);
-          luaG_runerror(L, "type error %s %s",tsvalue(ra),tsvalue(rb));
-        }*/
         setobj2s(L, ra, rb);
         vmbreak;
       }
@@ -883,8 +885,6 @@ void luaV_execute (lua_State *L) {
       }
       vmcase(OP_SETUPVAL) {
         UpVal *uv = cl->upvals[GETARG_B(i)];
-        /*if(uv->v->tt_!=LUA_TNIL&&uv->v->tt_!=ra->tt_) \
-          luaG_runerror(L, "type error");\*/
         setobj(L, uv->v, ra);
         luaC_upvalbarrier(L, uv);
         vmbreak;
@@ -912,10 +912,8 @@ void luaV_execute (lua_State *L) {
       }
       vmcase(OP_NEWARRAY) {
         int b = GETARG_B(i);
-        //int c = GETARG_C(i);
         Table *t = luaH_new(L);
         sethvalue(L, ra, t);
-        //LOGD("newtable %d",b);
         t->type=1;
         if (b != 0)
           luaH_resize(L, t, luaO_fb2int(b), luaO_fb2int(0));
@@ -1298,6 +1296,18 @@ void luaV_execute (lua_State *L) {
         ci->u.l.savedpc += GETARG_sBx(i);
         vmbreak;
       }
+        vmcase(OP_TFOREACH) {
+          StkId cb = ra + 3;  /* call base */
+          lua_pushcfunction(L, luaB_next);  /* will return generator, */
+          lua_pushvalue(L,-2);
+          L->top = cb + 3;  /* func. + 2 args (state and index) */
+          lua_call(L, 1, 3);
+          setobjs2s(L, cb+2, ra+2);
+          setobjs2s(L, cb+1, ra+1);
+          setobjs2s(L, cb, ra);
+          L->top = ci->top;
+          vmbreak;
+        }
       vmcase(OP_TFORCALL) {
         StkId cb = ra + 3;  /* call base */
         setobjs2s(L, cb+2, ra+2);
@@ -1314,7 +1324,7 @@ void luaV_execute (lua_State *L) {
       vmcase(OP_TFORLOOP) {
         l_tforloop:
         if (!ttisnil(ra + 1)) {  /* continue loop? */
-          setobjs2s(L, ra, ra + 1);  /* save control variable */
+           setobjs2s(L, ra, ra + 1);  /* save control variable */
            ci->u.l.savedpc += GETARG_sBx(i);  /* jump back */
         }
         vmbreak;
@@ -1371,6 +1381,11 @@ void luaV_execute (lua_State *L) {
       }
       vmcase(OP_EXTRAARG) {
         lua_assert(0);
+        vmbreak;
+      }
+      vmcase(OP_TBC) {
+        UpVal *up = luaF_findupval(L, ra);  /* create new upvalue */
+        up->tt = LUA_TUPVALTBC;  /* mark it to be closed */
         vmbreak;
       }
     }

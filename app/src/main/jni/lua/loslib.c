@@ -14,8 +14,15 @@
 #include <locale.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__LP64__)
 #include <time.h>
-
+#else
+#include <time64.h>
+#define time_t time64_t
+#define localtime_r localtime64_r
+#define gmtime_r gmtime64_r
+#define mktime mktime64
+#endif
 #include "lua.h"
 
 #include "lauxlib.h"
@@ -345,7 +352,7 @@ static int os_time (lua_State *L) {
 static int os_difftime (lua_State *L) {
   time_t t1 = l_checktime(L, 1);
   time_t t2 = l_checktime(L, 2);
-  lua_pushnumber(L, (lua_Number)difftime(t1, t2));
+  lua_pushnumber(L, (lua_Number)t1-t2);//difftime(t1, t2));
   return 1;
 }
 
@@ -376,6 +383,31 @@ static int os_exit (lua_State *L) {
   return 0;
 }
 
+static int os_popen (lua_State *L) {
+    const char *cmd = lua_tostring(L, lua_upvalueindex(1));
+    const char *arg = lua_tostring(L, 1);
+    cmd=lua_pushfstring(L,"%s %s",cmd,arg);
+    FILE *f = popen(cmd, "r");
+    size_t nr;
+    luaL_Buffer b;
+    luaL_buffinit(L, &b);
+    do {  /* read file in chunks of LUAL_BUFFERSIZE bytes */
+        char *p = luaL_prepbuffer(&b);
+        nr = fread(p, sizeof(char), LUAL_BUFFERSIZE, f);
+        luaL_addsize(&b, nr);
+    } while (nr == LUAL_BUFFERSIZE);
+    luaL_pushresult(&b);  /* close buffer */
+    int stat=pclose(f);
+    if(stat==0)
+      return 1;
+    return luaL_execresult(L,stat);
+}
+
+static int os_index (lua_State *L) {
+  lua_pushvalue(L,2);
+  lua_pushcclosure(L,os_popen,1);
+  return 1;
+}
 
 static const luaL_Reg syslib[] = {
   {"clock",     os_clock},
@@ -398,6 +430,10 @@ static const luaL_Reg syslib[] = {
 
 LUAMOD_API int luaopen_os (lua_State *L) {
   luaL_newlib(L, syslib);
+  lua_newtable(L);
+  lua_pushcclosure(L,os_index,0);
+  lua_setfield(L,-2,"__index");
+  lua_setmetatable(L,-2);
   return 1;
 }
 

@@ -171,6 +171,28 @@ static int luaB_setmetatable (lua_State *L) {
   return 1;
 }
 
+//--mod by nirenr
+static int luaB_setmetamethod (lua_State *L) {
+  int t = lua_type(L, 3);
+  luaL_checktype(L, 1, LUA_TTABLE);
+  luaL_argcheck(L, t == LUA_TNIL || t == LUA_TTABLE || t == LUA_TFUNCTION, 2,
+                "table function or nil expected");
+  if (luaL_getmetafield(L, 1, "__metatable") != LUA_TNIL)
+    return luaL_error(L, "cannot change a protected metatable");
+  lua_settop(L, 3);
+  lua_getmetatable(L,1);
+  if(lua_type(L,4)!=LUA_TTABLE){
+    lua_settop(L, 3);
+    lua_newtable(L);
+    lua_setmetatable(L, 1);
+    lua_getmetatable(L, 1);
+  }
+  lua_insert(L,2);
+  lua_settable(L,2);
+    lua_settop(L,1);
+  return 1;
+}
+//---
 
 static int luaB_rawequal (lua_State *L) {
   luaL_checkany(L, 1);
@@ -392,6 +414,16 @@ static int luaB_load (lua_State *L) {
   return load_aux(L, status, env);
 }
 
+static int luaB_loadstring (lua_State *L) {
+  int status;
+  size_t l;
+  const char *s = luaL_checklstring(L, 1, &l);
+  const char *mode = luaL_optstring(L, 3, "bt");
+  int env = (!lua_isnone(L, 4) ? 4 : 0);  /* 'env' index or 0 if no 'env' */
+  const char *chunkname = luaL_optstring(L, 2, s);
+  status = luaL_loadbufferx(L, s, l, chunkname, mode);
+  return load_aux(L, status, env);
+}
 /* }====================================================== */
 
 
@@ -519,7 +551,7 @@ static const luaL_Reg base_funcs[] = {
   {"loadfile", luaB_loadfile},
   {"load", luaB_load},
 #if defined(LUA_COMPAT_LOADSTRING)
-  {"loadstring", luaB_load},
+  {"loadstring", luaB_loadstring},
 #endif
   {"next", luaB_next},
   {"pairs", luaB_pairs},
@@ -531,6 +563,7 @@ static const luaL_Reg base_funcs[] = {
   {"rawset", luaB_rawset},
   {"select", luaB_select},
   {"setmetatable", luaB_setmetatable},
+  {"setmetamethod", luaB_setmetamethod},
   {"tointeger", luaB_tointeger},
   {"tonumber", luaB_tonumber},
   {"tostring", luaB_tostring},

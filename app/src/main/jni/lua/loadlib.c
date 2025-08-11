@@ -603,6 +603,17 @@ static void set_env (lua_State *L) {
   lua_pop(L, 1);  /* remove function */
 }
 
+static void db_setfenv (lua_State *L) {
+  lua_Debug ar;
+  int nvar = 1;  /* local-variable index */
+  /* stack-level argument */
+  if (!lua_getstack(L, 1, &ar))  /* out of range? */
+     luaL_argerror(L, 1, "level out of range");
+  lua_getinfo(L, "u", &ar);
+  lua_pushvalue(L, -1);  /* copy new environment table to top */
+  lua_setlocal(L, &ar, nvar + ar.nparams);
+  return ;
+}
 
 //mod by nirenr
 static void dooptions (lua_State *L, int n) {
@@ -713,7 +724,7 @@ static int ll_module (lua_State *L) {
     modinit(L, modname);
   }
   lua_pushvalue(L, -1);
-  set_env(L);
+  db_setfenv(L);
   if (!lua_getmetatable(L, -1)) {
     lua_pushvalue(L, -1);
     lua_setmetatable(L, -2);

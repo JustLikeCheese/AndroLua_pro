@@ -22,6 +22,133 @@ function onVersionChanged(n, o)
     local dlg = AlertDialogBuilder(activity)
     local title = "更新" .. o .. ">" .. n
     local msg = [[
+    5.0.20
+    修复break;解析错误，
+    修复协程不能使用java对象bug，
+    
+    5.0.19
+    Http支持忽略证书错误，
+    表构建支持更多形式，
+
+    5.0.18
+    支持content导入，
+
+    5.0.17
+    task支持最大8196个线程，同步执行1024.
+
+    5.0.16
+    修复字符串编译运行时bug。
+
+    5.0.15
+    LuaBtmap支持设置http header。
+
+    5.0.14
+    修复打包出错的bug，
+    优化Http异步接口。
+
+    5.0.13
+    接口报错优化
+
+    5.0.12
+    LuaWebView增加setCookie,getCookie,getSource方法
+
+    5.0.11
+    修复9.png的算法bug。
+
+    5.0.10
+    支持LuaPreferenceFragment(t) LuaFragment(t),
+    activity.getSharedData()返回全部内容(不可修改)。
+
+    5.0.9
+    bug修复。
+
+    5.0.8
+    bug修复。
+
+    5.0.7
+    修复switch的bug。
+
+    5.0.6
+    修复bug。
+
+    5.0.5
+    修复http异步上传的bug。
+
+    5.0.4
+    修复http异步编码bug。
+
+    5.0.3
+    bug修复。
+
+    5.0.2
+    优化编辑器。
+
+    5.0.1
+    bug修复。
+
+    5.0.0
+    解决65000对象引用问题
+
+    4.4.4
+    支持变长参数。
+    bug 修复。
+
+    4.4.3
+    bug 修复。
+
+    4.4.2
+    bug 修复。
+
+    4.4.1
+    switch case 支持多个值。
+
+    4.4.0
+    bug 修复。
+
+    4.3.6
+    bug 修复。
+
+    4.3.5
+    支持有参数构建函数的虚类。
+
+    4.3.4
+    增加table.const(常量表)。
+    增加数组a=[]。
+
+    4.3.3
+    增加when(单行判断语句)。
+
+    4.3.2
+    增加bsh(测试)。
+
+    4.3.1
+    增加一些函数。
+
+    4.3.0
+    增加lambda关键字。
+    增加defer延时执行。
+    增加toclose自关闭局部变量，变量名前加*。
+
+    4.2.6
+    os.date支持64位时间。
+
+    4.2.5
+    io增加部分函数。
+
+    4.2.4
+    table增加部分函数。
+
+    4.2.3
+    增加luajava.override。
+    增加使用关键字作table的key。
+
+    4.2.2
+    修复setSharedData bug。
+
+    4.2.1
+    优化多维数组。
+    增加luajava.astable(obk,true)深转换。
+
     4.2.0
     支持虚类。
 
@@ -225,7 +352,7 @@ function onVersionChanged(n, o)
     3.6.0
     修复finish activity可能导致程序退出的bug。
     修复运行内嵌子工程引用目录混乱的bug。
-    增强辅助功能超级辅助。\
+    增强辅助功能超级辅助。
 
     3.5.9
     修复华为看不到log的bug。
@@ -562,13 +689,14 @@ end
 activity.getWindow().setSoftInputMode(0x10)
 
 --activity.getActionBar().show()
-history = {}
+
 luahist = luajava.luadir .. "/lua.hist"
 luadir = luajava.luaextdir .. "/" or "/sdcard/androlua/"
 luaconf = luajava.luadir .. "/lua.conf"
 luaproj = luajava.luadir .. "/lua.proj"
 pcall(dofile, luaconf)
 pcall(dofile, luahist)
+history = history or {}
 luapath = luapath or luadir .. "new.lua"
 luadir = luapath:match("^(.-)[^/]+$")
 pcall(dofile, luaproj)
@@ -810,9 +938,12 @@ function read(path)
     end
     local str = f:read("*all")
     f:close()
-    if string.byte(str) == 0x1b then
+    if str~="" then
+    local c=string.byte(str);
+    if  c <= 0x1c and c>= 0x1a and c!=" " and c!="\t" then
         Toast.makeText(activity, "不能打开已编译文件." .. path, Toast.LENGTH_LONG ).show()
         return
+    end
     end
     editor.setText(str)
 
@@ -1101,7 +1232,7 @@ function export(pdir)
     return tmp
 end
 
-function getalpinfo(path)
+function getalpinfo(path,data)
     local app = {}
     loadstring(tostring(String(LuaUtil.readZip(path, "init.lua"))), "bt", "bt", app)()
     local str = string.format("名称: %s\
@@ -1115,15 +1246,16 @@ function getalpinfo(path)
             app.packagename,
             app.developer,
             app.description,
-            path
+            data
     )
     return str, app.mode
 end
 
-function imports(path)
+function imports(path,data)
     create_imports_dlg()
+    imports_path=path
     local mode
-    imports_dlg.Message, mode = getalpinfo(path)
+    imports_dlg.Message, mode = getalpinfo(path,data)
     if mode == "plugin" or path:match("^([^%._]+)_plugin") then
         imports_dlg.setTitle("导入插件")
     elseif mode == "build" or path:match("^([^%._]+)_build") then
@@ -1460,7 +1592,7 @@ function onMenuItemSelected(id, item)
     }
 end
 
-activity.setContentView(layout.main)
+activity.setContentView(loadlayout(layout.main))
 
 function onCreate(s)
     --[[ local intent=activity.getIntent()
@@ -1486,7 +1618,26 @@ end
 function onNewIntent(intent)
     local uri = intent.getData()
     if uri and uri.getPath():find("%.alp$") then
-        imports(uri.getPath():match("/storage.+") or uri.getPath())
+        local data = intent.getData();
+        if (data ~= nil)
+            local path = data.getPath();
+            if (path ~= null)
+                if ("content" == (data.getScheme()))
+                    local ins = activity.getContentResolver().openInputStream(data);
+                    local path2 = activity.getLuaExtPath("cache", File(data.getPath()).getName());
+                    local out = FileOutputStream(path2);
+                    LuaUtil.copyFile(ins, out);
+                    out.close();
+                    imports(path2,data);
+                    return ;
+                end
+                local idx = path.indexOf("/storage/emulated/");
+                if (idx > 0)
+                    path = path.substring(idx);
+                end
+                imports(path,data);
+            end
+        end
     end
 end
 
@@ -1574,7 +1725,7 @@ function create_imports_dlg()
     imports_dlg.setTitle("导入")
     imports_dlg.setPositiveButton("确定", {
         onClick = function()
-            local path = imports_dlg.Message:match("路径: (.+)$")
+            local path = imports_path
             if imports_dlg.Title == "打包安装" then
                 importx(path, "build")
                 imports_dlg.setTitle("导入")
